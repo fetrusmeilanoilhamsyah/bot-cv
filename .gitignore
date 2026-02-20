@@ -1,0 +1,27 @@
+# Environment & Secret
+.env
+
+# Folder sementara user
+tmp/sessions/
+
+# Log
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Database lokal
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db

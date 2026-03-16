@@ -219,7 +219,7 @@ def main():
 
     # Command handlers
     app.add_handler(CommandHandler("start", rate_limiter(cmd_start)))
-    app.add_handler(CommandHandler("reset", rate_limiter(cmd_reset)))
+    app.add_handler(CommandHandler(["reset", "resetdatabase"], rate_limiter(cmd_reset)))
     app.add_handler(CommandHandler(["admin", "Admin"], rate_limiter(cmd_admin)))
     app.add_handler(CommandHandler("merge", rate_limiter(cmd_merge)))
     app.add_handler(CommandHandler("vcftotxt", rate_limiter(cmd_vcftotxt)))

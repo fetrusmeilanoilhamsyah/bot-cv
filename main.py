@@ -102,7 +102,7 @@ MAX_CONCURRENT_PER_USER = 2  # Max 2 operations per user at once
 user_semaphores = defaultdict(lambda: Semaphore(MAX_CONCURRENT_PER_USER))
 
 
-async def rate_limiter(func):
+def rate_limiter(func):
     """Decorator untuk rate limiting per user"""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
@@ -211,25 +211,25 @@ def main():
     )
 
     # Command handlers
-    app.add_handler(CommandHandler("start", await rate_limiter(cmd_start)))
-    app.add_handler(CommandHandler("reset", await rate_limiter(cmd_reset)))
-    app.add_handler(CommandHandler("admin", await rate_limiter(cmd_admin)))
-    app.add_handler(CommandHandler("merge", await rate_limiter(cmd_merge)))
-    app.add_handler(CommandHandler("vcftotxt", await rate_limiter(cmd_vcftotxt)))
-    app.add_handler(CommandHandler("pecahvcf", await rate_limiter(cmd_pecahvcf)))
-    app.add_handler(CommandHandler("rename", await rate_limiter(cmd_rename)))
-    app.add_handler(CommandHandler("txttovcf", await rate_limiter(cmd_txttovcf)))
-    app.add_handler(CommandHandler("broadcast", await rate_limiter(cmd_broadcast)))
-    app.add_handler(CommandHandler("newmember", await rate_limiter(cmd_newmember)))
-    app.add_handler(CommandHandler("done", await rate_limiter(done_router)))
+    app.add_handler(CommandHandler("start", rate_limiter(cmd_start)))
+    app.add_handler(CommandHandler("reset", rate_limiter(cmd_reset)))
+    app.add_handler(CommandHandler("admin", rate_limiter(cmd_admin)))
+    app.add_handler(CommandHandler("merge", rate_limiter(cmd_merge)))
+    app.add_handler(CommandHandler("vcftotxt", rate_limiter(cmd_vcftotxt)))
+    app.add_handler(CommandHandler("pecahvcf", rate_limiter(cmd_pecahvcf)))
+    app.add_handler(CommandHandler("rename", rate_limiter(cmd_rename)))
+    app.add_handler(CommandHandler("txttovcf", rate_limiter(cmd_txttovcf)))
+    app.add_handler(CommandHandler("broadcast", rate_limiter(cmd_broadcast)))
+    app.add_handler(CommandHandler("newmember", rate_limiter(cmd_newmember)))
+    app.add_handler(CommandHandler("done", rate_limiter(done_router)))
 
     # Callback Query Handler (no rate limiter for callbacks yet)
     from handlers.reset import handle_reset_callback
     app.add_handler(CallbackQueryHandler(handle_reset_callback, pattern="^admin_db_reset"))
 
     # Message handlers (wrapped with rate limiter)
-    app.add_handler(MessageHandler(filters.Document.ALL, await rate_limiter(file_router)))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, await rate_limiter(text_router)))
+    app.add_handler(MessageHandler(filters.Document.ALL, rate_limiter(file_router)))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rate_limiter(text_router)))
 
     # Error handler
     app.add_error_handler(error_handler)

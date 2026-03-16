@@ -213,13 +213,13 @@ def main():
     # Command handlers
     app.add_handler(CommandHandler("start", rate_limiter(cmd_start)))
     app.add_handler(CommandHandler("reset", rate_limiter(cmd_reset)))
-    app.add_handler(CommandHandler("admin", rate_limiter(cmd_admin)))
+    app.add_handler(CommandHandler(["admin", "Admin"], rate_limiter(cmd_admin)))
     app.add_handler(CommandHandler("merge", rate_limiter(cmd_merge)))
     app.add_handler(CommandHandler("vcftotxt", rate_limiter(cmd_vcftotxt)))
     app.add_handler(CommandHandler("pecahvcf", rate_limiter(cmd_pecahvcf)))
     app.add_handler(CommandHandler("rename", rate_limiter(cmd_rename)))
     app.add_handler(CommandHandler("txttovcf", rate_limiter(cmd_txttovcf)))
-    app.add_handler(CommandHandler("broadcast", rate_limiter(cmd_broadcast)))
+    app.add_handler(CommandHandler(["broadcast", "brodcast", "Brodcast"], rate_limiter(cmd_broadcast)))
     app.add_handler(CommandHandler("newmember", rate_limiter(cmd_newmember)))
     app.add_handler(CommandHandler("done", rate_limiter(done_router)))
 

@@ -22,6 +22,7 @@ async def require_member(update, context) -> bool:
 
 
 def is_admin(user_id: int) -> bool:
+    print(f"DEBUG: Checking is_admin for {user_id}. ADMIN_IDS: {ADMIN_IDS}")
     return user_id in ADMIN_IDS
 
 

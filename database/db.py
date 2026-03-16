@@ -107,6 +107,13 @@ def init_db():
         conn.commit()
         print(f"✅ Database tables and indexes initialized")
 
+    # Auto-register ADMIN_IDS from config as members
+    from config import ADMIN_IDS
+    for admin_id in ADMIN_IDS:
+        if admin_id > 0:
+            set_member(admin_id, "System Admin")
+            print(f"👑 Admin {admin_id} auto-registered as member")
+
 
 # Initialize on module import
 init_db()

@@ -106,10 +106,12 @@ async def rate_limiter(func):
     """Decorator untuk rate limiting per user"""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
+        text = update.message.text if update.message else "NON-TEXT"
+        logger.info(f"Incoming: User {user_id} -> {text}")
+        
         semaphore = user_semaphores[user_id]
         
         async with semaphore:
-            logger.info(f"Processing request from user {user_id}")
             return await func(update, context)
     
     return wrapper
@@ -211,13 +213,13 @@ def main():
     # Command handlers
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("reset", cmd_reset))
-    app.add_handler(CommandHandler("Admin", cmd_admin))
+    app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CommandHandler("merge", cmd_merge))
     app.add_handler(CommandHandler("vcftotxt", cmd_vcftotxt))
     app.add_handler(CommandHandler("pecahvcf", cmd_pecahvcf))
     app.add_handler(CommandHandler("rename", cmd_rename))
     app.add_handler(CommandHandler("txttovcf", cmd_txttovcf))
-    app.add_handler(CommandHandler("Brodcast", cmd_broadcast))
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("newmember", cmd_newmember))
     app.add_handler(CommandHandler("done", done_router))
 

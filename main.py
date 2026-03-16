@@ -15,6 +15,7 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
     ContextTypes,
 )
@@ -219,6 +220,10 @@ def main():
     app.add_handler(CommandHandler("Brodcast", cmd_broadcast))
     app.add_handler(CommandHandler("newmember", cmd_newmember))
     app.add_handler(CommandHandler("done", done_router))
+
+    # Callback Query Handler (for Reset and other inline buttons)
+    from handlers.reset import handle_reset_callback
+    app.add_handler(CallbackQueryHandler(handle_reset_callback, pattern="^admin_db_reset"))
 
     # Message handlers (with rate limiting)
     app.add_handler(MessageHandler(filters.Document.ALL, file_router))

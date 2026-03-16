@@ -173,15 +173,19 @@ def get_all_user_ids():
         return [r["id"] for r in rows]
 
 
-def clear_all_users():
-    """Clear all users and broadcast logs"""
+def clear_all_db():
+    """Wipe all database tables (SQLite) and re-init"""
     with get_connection() as conn:
-        conn.execute("DELETE FROM broadcast_log")
-        conn.execute("DELETE FROM users")
+        conn.execute("DROP TABLE IF EXISTS users")
+        conn.execute("DROP TABLE IF EXISTS broadcast_log")
         conn.commit()
+    
+    # Re-initialize tables
+    init_db()
     
     _session_cache.clear()
     _all_buffers.clear()
+    print("⚠️ DATABASE RESET: All tables dropped and re-initialized")
 
 
 # ─── BATCH OPERATIONS (NEW) ───────────────────────────────────────────────────

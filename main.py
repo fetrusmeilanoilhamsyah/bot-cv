@@ -79,6 +79,11 @@ from handlers.new_member import (
     handle_newmember_id,
     STATE as NEWMEMBER_STATE,
 )
+from handlers.del_member import (
+    cmd_delmember,
+    handle_delmember_id,
+    STATE as DELMEMBER_STATE,
+)
 
 # Rate limiting imports
 from asyncio import Semaphore
@@ -152,6 +157,8 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_broadcast_msg(update, context)
     elif state == NEWMEMBER_STATE:
         await handle_newmember_id(update, context)
+    elif state == DELMEMBER_STATE:
+        await handle_delmember_id(update, context)
 
 
 async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -221,6 +228,7 @@ def main():
     app.add_handler(CommandHandler("txttovcf", rate_limiter(cmd_txttovcf)))
     app.add_handler(CommandHandler(["broadcast", "brodcast", "Brodcast"], rate_limiter(cmd_broadcast)))
     app.add_handler(CommandHandler("newmember", rate_limiter(cmd_newmember)))
+    app.add_handler(CommandHandler(["delmember", "copotmember"], rate_limiter(cmd_delmember)))
     app.add_handler(CommandHandler("done", rate_limiter(done_router)))
 
     # Callback Query Handler (no rate limiter for callbacks yet)

@@ -151,6 +151,13 @@ def is_member(user_id: int) -> bool:
     return row is not None and bool(row["is_member"])
 
 
+def remove_member(user_id: int):
+    """Remove user from membership status"""
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET is_member = 0 WHERE id = ?", (user_id,))
+        conn.commit()
+
+
 def set_member(user_id: int, full_name: str = ""):
     """Set user as member"""
     with get_connection() as conn:
@@ -177,18 +184,24 @@ def get_all_user_ids():
 
 
 def clear_all_db():
-    """Wipe all database tables (SQLite) and re-init"""
+    """Smart Reset: Clear logs and sessions but preserve users and premium status"""
     with get_connection() as conn:
-        conn.execute("DROP TABLE IF EXISTS users")
-        conn.execute("DROP TABLE IF EXISTS broadcast_log")
+        # Clear broadcast history
+        conn.execute("DELETE FROM broadcast_log")
         conn.commit()
     
-    # Re-initialize tables
-    init_db()
-    
+    # Clear in-memory buffers
     _session_cache.clear()
     _all_buffers.clear()
-    print("⚠️ DATABASE RESET: All tables dropped and re-initialized")
+    
+    # Clear on-disk temporary files via session middleware (if possible)
+    try:
+        from middleware.session import clear_all_sessions
+        clear_all_sessions()
+    except ImportError:
+        pass
+        
+    print("⚠️ SMART RESET: Logs and sessions cleared. Users and Premium status preserved.")
 
 
 # ─── BATCH OPERATIONS (NEW) ───────────────────────────────────────────────────

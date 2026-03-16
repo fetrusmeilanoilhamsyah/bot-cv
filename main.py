@@ -211,25 +211,25 @@ def main():
     )
 
     # Command handlers
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("reset", cmd_reset))
-    app.add_handler(CommandHandler("admin", cmd_admin))
-    app.add_handler(CommandHandler("merge", cmd_merge))
-    app.add_handler(CommandHandler("vcftotxt", cmd_vcftotxt))
-    app.add_handler(CommandHandler("pecahvcf", cmd_pecahvcf))
-    app.add_handler(CommandHandler("rename", cmd_rename))
-    app.add_handler(CommandHandler("txttovcf", cmd_txttovcf))
-    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
-    app.add_handler(CommandHandler("newmember", cmd_newmember))
-    app.add_handler(CommandHandler("done", done_router))
+    app.add_handler(CommandHandler("start", await rate_limiter(cmd_start)))
+    app.add_handler(CommandHandler("reset", await rate_limiter(cmd_reset)))
+    app.add_handler(CommandHandler("admin", await rate_limiter(cmd_admin)))
+    app.add_handler(CommandHandler("merge", await rate_limiter(cmd_merge)))
+    app.add_handler(CommandHandler("vcftotxt", await rate_limiter(cmd_vcftotxt)))
+    app.add_handler(CommandHandler("pecahvcf", await rate_limiter(cmd_pecahvcf)))
+    app.add_handler(CommandHandler("rename", await rate_limiter(cmd_rename)))
+    app.add_handler(CommandHandler("txttovcf", await rate_limiter(cmd_txttovcf)))
+    app.add_handler(CommandHandler("broadcast", await rate_limiter(cmd_broadcast)))
+    app.add_handler(CommandHandler("newmember", await rate_limiter(cmd_newmember)))
+    app.add_handler(CommandHandler("done", await rate_limiter(done_router)))
 
-    # Callback Query Handler (for Reset and other inline buttons)
+    # Callback Query Handler (no rate limiter for callbacks yet)
     from handlers.reset import handle_reset_callback
     app.add_handler(CallbackQueryHandler(handle_reset_callback, pattern="^admin_db_reset"))
 
-    # Message handlers (with rate limiting)
-    app.add_handler(MessageHandler(filters.Document.ALL, file_router))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
+    # Message handlers (wrapped with rate limiter)
+    app.add_handler(MessageHandler(filters.Document.ALL, await rate_limiter(file_router)))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, await rate_limiter(text_router)))
 
     # Error handler
     app.add_error_handler(error_handler)

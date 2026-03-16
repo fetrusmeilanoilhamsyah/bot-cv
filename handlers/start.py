@@ -18,10 +18,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.upsert_user(user.id, user.username or "", user.full_name or "")
 
     await update.message.reply_text(
-        f"Selamat datang di DiBot CV FEE.\n\n"
-        f"Bot ini membantu Anda mengolah file VCF secara otomatis.\n\n"
-        f"Untuk menjadi member dan mengakses semua fitur, silakan hubungi:\n"
-        f"{ADMIN_CONTACT}\n\n"
-        f"Bergabung ke grup kami: {GROUP_LINK}\n\n"
-        f"Harga member: {HARGA_MEMBER}"
+        f"<b>DIBOT CV FEE</b>\n"
+        f"────────────────────\n"
+        f"Sistem pengolah file VCF otomatis untuk optimasi database kontak Anda.\n\n"
+        f"<b>Akses & Layanan:</b>\n"
+        f"• Admin: {ADMIN_CONTACT}\n"
+        f"• Community: {GROUP_LINK}\n"
+        f"• Membership: {HARGA_MEMBER}\n\n"
+        f"Gunakan menu perintah untuk memulai.",
+        parse_mode="HTML"
     )

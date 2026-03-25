@@ -1,84 +1,89 @@
 """
 vcf_parser.py
-Baca dan tulis file VCF. Tidak mengubah format nomor,
-hanya menambahkan + di depan jika belum ada.
+Baca dan tulis file VCF super cepat. Kecepatan ini untuk menghindari GIL block 
+pada event loop Telegram.
 """
+import re
+
+# Pre-compile regex for maximum performance
+_CLEAN_RE = re.compile(r"[\s\-\.\(\),]")
 
 def add_plus(number: str) -> str:
-    import re
+    if not number:
+        return ""
+    
     number = number.strip()
     if not number:
-        return number
+        return ""
 
-    # Sudah ada + di depan, bersihkan karakter kotor sisanya
     if number.startswith("+"):
-        return "+" + re.sub(r"[\s\-\.\(\),]", "", number[1:])
+        return "+" + _CLEAN_RE.sub("", number[1:])
 
-    # Bersihkan semua karakter kotor
-    cleaned = re.sub(r"[\s\-\.\(\),]", "", number)
+    cleaned = _CLEAN_RE.sub("", number)
 
-    # Indonesia: 08xxx → +628xxx
     if cleaned.startswith("08"):
         return "+62" + cleaned[1:]
-
-    # Sudah format 628xxx
     if cleaned.startswith("628"):
         return "+" + cleaned
-
-    # Format lain tambah + saja
     return "+" + cleaned
 
 
-def parse_vcf(content: str) -> list:
+def parse_vcf_lines(lines_iterable) -> list:
     """
-    Baca isi VCF string, kembalikan list of dict:
-    [{"name": "...", "tel": "..."}, ...]
-    Urutan sesuai urutan di file.
+    Parser sangat efisien memori. Menerima lazy iterable (misal dari objek file).
+    Mencegah string split() berukuran GB yang menahan GIL main thread.
     """
     contacts = []
-    current = {}
-    for line in content.splitlines():
+    current_name = None
+    current_tel = None
+    
+    for line in lines_iterable:
         line = line.strip()
-        if line.upper() == "BEGIN:VCARD":
-            current = {}
-        elif line.upper().startswith("FN:"):
-            current["name"] = line[3:]
-        elif line.upper().startswith("TEL"):
-            # Ambil nilai setelah tanda :
+        if not line:
+            continue
+            
+        upper_line = line.upper()
+        if upper_line == "BEGIN:VCARD":
+            current_name = None
+            current_tel = None
+        elif upper_line.startswith("FN:"):
+            current_name = line[3:]
+        elif upper_line.startswith("TEL"):
             if ":" in line:
                 tel = line.split(":", 1)[1].strip()
-                current["tel"] = add_plus(tel)
-        elif line.upper() == "END:VCARD":
-            if "tel" in current:
-                if "name" not in current:
-                    current["name"] = current["tel"]
-                contacts.append(current)
-            current = {}
+                current_tel = add_plus(tel)
+        elif upper_line == "END:VCARD":
+            if current_tel:
+                if not current_name:
+                    current_name = current_tel
+                contacts.append({"name": current_name, "tel": current_tel})
+            current_name = None
+            current_tel = None
+            
     return contacts
 
 
+def parse_vcf(content: str) -> list:
+    """Tinggal untuk kapabilitas backwards, panggil the optimized one."""
+    return parse_vcf_lines(content.splitlines())
+
+
 def parse_vcf_file(filepath: str) -> list:
+    """Best performant file-to-list."""
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
-    return parse_vcf(content)
+        return parse_vcf_lines(f)
 
 
 def contacts_to_vcf(contacts: list) -> str:
     """
-    Ubah list of dict ke string VCF.
-    contacts = [{"name": "FEE1", "tel": "+628xxx"}, ...]
+    Super cepat mengubah ke list of string (C-optimized join).
     """
     lines = []
     for c in contacts:
-        lines.append("BEGIN:VCARD")
-        lines.append("VERSION:3.0")
-        lines.append(f"FN:{c['name']}")
-        lines.append(f"TEL;TYPE=CELL:{c['tel']}")
-        lines.append("END:VCARD")
+        lines.append(f"BEGIN:VCARD\nVERSION:3.0\nFN:{c['name']}\nTEL;TYPE=CELL:{c['tel']}\nEND:VCARD")
     return "\n".join(lines) + "\n"
 
-
 def write_vcf(filepath: str, contacts: list):
-    content = contacts_to_vcf(contacts)
+    """Tulis VCF langsung ke file_path."""
     with open(filepath, "w", encoding="utf-8") as f:
-        f.write(content)
+        f.write(contacts_to_vcf(contacts))

@@ -1,6 +1,7 @@
 """
 admin_navy.py — In-memory approach, tidak ada disk sama sekali.
 """
+import io
 from telegram import Update
 from telegram.ext import ContextTypes
 from database import db
@@ -22,8 +23,7 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db.set_session(user_id, STATES["WAIT_ADMIN_NUMBERS"], {})
     await update.message.reply_text(
-        "Berikan nomor ADMIN.\n"
-        "Format: satu nomor per baris, contoh:\n"
+        "Nomor ADMIN (satu per baris):\n"
         "628123456789\n"
         "628987654321"
     )
@@ -40,29 +40,23 @@ async def handle_admin_navy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         numbers = [n.strip() for n in text.splitlines() if n.strip()]
         data["admin_numbers"] = numbers
         db.set_session(user_id, STATES["WAIT_NAVY_NUMBERS"], data)
-        await update.message.reply_text(
-            "Berikan nomor NAVY.\nFormat: satu nomor per baris."
-        )
+        await update.message.reply_text("Nomor NAVY (satu per baris):")
 
     elif state == STATES["WAIT_NAVY_NUMBERS"]:
         numbers = [n.strip() for n in text.splitlines() if n.strip()]
         data["navy_numbers"] = numbers
         db.set_session(user_id, STATES["WAIT_ADMIN_NAME"], data)
-        await update.message.reply_text(
-            "Masukkan nama ADMIN (label kontak untuk nomor ADMIN):"
-        )
+        await update.message.reply_text("Nama label ADMIN:")
 
     elif state == STATES["WAIT_ADMIN_NAME"]:
         data["admin_name"] = text
         db.set_session(user_id, STATES["WAIT_NAVY_NAME"], data)
-        await update.message.reply_text(
-            "Masukkan nama NAVY (label kontak untuk nomor NAVY):"
-        )
+        await update.message.reply_text("Nama label NAVY:")
 
     elif state == STATES["WAIT_NAVY_NAME"]:
         data["navy_name"] = text
         db.set_session(user_id, STATES["WAIT_FILE_NAME"], data)
-        await update.message.reply_text("Masukkan nama file output:")
+        await update.message.reply_text("Nama file output:")
 
     elif state == STATES["WAIT_FILE_NAME"]:
         data["file_name"] = text
@@ -90,6 +84,6 @@ async def handle_admin_navy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.clear_session(user_id)
 
         await update.message.reply_document(
-            document=vcf_bytes,
+            document=io.BytesIO(vcf_bytes),
             filename=f"{data['file_name']}.vcf"
         )

@@ -1,12 +1,16 @@
 """
-pecahvcf.py — In-memory approach.
+pecahvcf.py — Disk-based approach to prevent OOM
 """
+import os
+import shutil
+import asyncio
 from io import BytesIO
 from telegram import Update
 from telegram.ext import ContextTypes
 from database import db
 from middleware.auth import require_member
-from core.vcf_parser import parse_vcf, contacts_to_vcf
+from middleware.session import get_user_dir
+from core.vcf_parser import parse_vcf_file, contacts_to_vcf
 
 STATE_PER_FILE = "PECAH_PER_FILE"
 STATE_WAIT_VCF = "PECAH_WAIT_VCF"
@@ -17,7 +21,7 @@ async def cmd_pecahvcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE_PER_FILE, {})
-    await update.message.reply_text("Berapa kontak per file? (contoh: 50)")
+    await update.message.reply_text("Kontak per file: (contoh: 50)")
 
 
 async def handle_pecah_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -30,7 +34,7 @@ async def handle_pecah_per_file(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Masukkan angka yang valid, contoh: 50")
         return
     db.set_session(user_id, STATE_WAIT_VCF, {"per_file": int(text)})
-    await update.message.reply_text("Kirimkan file VCF yang ingin dipecah.")
+    await update.message.reply_text("Kirim file VCF yang ingin dipecah.")
 
 
 async def handle_pecah_vcf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,26 +45,44 @@ async def handle_pecah_vcf_file(update: Update, context: ContextTypes.DEFAULT_TY
     data = sess["data"]
     per_file = data["per_file"]
 
-    await update.message.reply_text("Sedang memproses, harap tunggu...")
+    await update.message.reply_text("Memproses, harap tunggu...")
 
-    # Download ke RAM
     doc = update.message.document
     file_obj = await context.bot.get_file(doc.file_id)
-    bio = BytesIO()
-    await file_obj.download_to_memory(bio)
-    content = bio.getvalue().decode("utf-8", errors="ignore")
-
-    contacts = parse_vcf(content)
+    user_dir = get_user_dir(user_id)
+    pecah_dir = os.path.join(user_dir, "pecahvcf")
+    os.makedirs(pecah_dir, exist_ok=True)
+    input_path = os.path.join(pecah_dir, "input.vcf")
+    
+    await file_obj.download_to_drive(input_path)
     db.clear_session(user_id)
 
-    total_files = 0
-    for i in range(0, len(contacts), per_file):
-        chunk = contacts[i:i + per_file]
-        vcf_bytes = contacts_to_vcf(chunk).encode("utf-8")
-        total_files += 1
-        await update.message.reply_document(
-            document=vcf_bytes,
-            filename=f"PECAHAN{total_files}.vcf"
-        )
+    loop = asyncio.get_running_loop()
 
-    await update.message.reply_text(f"✅ Selesai. {total_files} file pecahan.")
+    def process_pecah():
+        contacts = parse_vcf_file(input_path)
+        
+        output_files = []
+        total_files = 0
+        for i in range(0, len(contacts), per_file):
+            chunk = contacts[i:i + per_file]
+            total_files += 1
+            out_path = os.path.join(pecah_dir, f"PECAHAN{total_files}.vcf")
+            with open(out_path, "w", encoding="utf-8") as f_out:
+                f_out.write(contacts_to_vcf(chunk))
+            output_files.append(out_path)
+            
+        return output_files
+
+    try:
+        output_files = await loop.run_in_executor(None, process_pecah)
+        
+        for idx, out_path in enumerate(output_files, 1):
+            with open(out_path, "rb") as f:
+                await update.message.reply_document(
+                    document=f,
+                    filename=os.path.basename(out_path)
+                )
+        await update.message.reply_text(f"Selesai. {len(output_files)} file pecahan.")
+    finally:
+        shutil.rmtree(pecah_dir, ignore_errors=True)

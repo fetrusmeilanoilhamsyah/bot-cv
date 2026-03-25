@@ -84,9 +84,18 @@ def init_db():
                 full_name   TEXT    DEFAULT '',
                 is_member   INTEGER DEFAULT 0,
                 joined_at   TEXT    DEFAULT (datetime('now')),
-                last_active TEXT    DEFAULT (datetime('now'))
+                last_active TEXT    DEFAULT (datetime('now')),
+                expired_at  TEXT    DEFAULT NULL
             )
         """)
+        
+        # Safe migration: add expired_at if db already exists without it
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN expired_at TEXT DEFAULT NULL")
+            conn.commit()
+            print("✅ Migrated: added expired_at column")
+        except Exception:
+            pass  # Column already exists — no action needed
         
         conn.execute("""
             CREATE TABLE IF NOT EXISTS broadcast_log (
@@ -102,17 +111,19 @@ def init_db():
         # Create indexes for better performance
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_member ON users(is_member)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_active ON users(last_active)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_expiry ON users(expired_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_broadcast_admin ON broadcast_log(admin_id)")
         
         conn.commit()
         print(f"✅ Database tables and indexes initialized")
 
-# Auto-register ADMIN_IDS from config as members
+    # Auto-register ADMIN_IDS from config as members (INSIDE init_db)
     from config import ADMIN_IDS
     for admin_id in ADMIN_IDS:
         if admin_id > 0:
             set_member(admin_id, "System Admin")
             print(f"👑 Admin {admin_id} auto-registered as member")
+
 
 
 # ─── IN-MEMORY SESSION CACHE ──────────────────────────────────────────────────
@@ -146,27 +157,80 @@ def get_user(user_id: int):
 
 
 def is_member(user_id: int) -> bool:
-    """Check if user is a member"""
+    """Check if user is an active member (auto-expires if past due)"""
+    from datetime import datetime
     row = get_user(user_id)
-    return row is not None and bool(row["is_member"])
+    if row is None or not bool(row["is_member"]):
+        return False
+    # Check VIP expiry — admins have no expiry (expired_at = NULL)
+    expired_at = dict(row).get("expired_at")
+    if expired_at is None:
+        return True  # Permanent member (admin or manually added)
+    if datetime.fromisoformat(expired_at) < datetime.now():
+        # Auto-revoke expired VIP
+        remove_member(user_id)
+        return False
+    return True
 
 
 def remove_member(user_id: int):
     """Remove user from membership status"""
     with get_connection() as conn:
-        conn.execute("UPDATE users SET is_member = 0 WHERE id = ?", (user_id,))
+        conn.execute("UPDATE users SET is_member = 0, expired_at = NULL WHERE id = ?", (user_id,))
         conn.commit()
 
 
 def set_member(user_id: int, full_name: str = ""):
-    """Set user as member"""
+    """Set user as permanent member (no expiry — for admins / manual grant)"""
     with get_connection() as conn:
         conn.execute("""
-            INSERT INTO users (id, username, full_name, is_member)
-            VALUES (?, '', ?, 1)
-            ON CONFLICT(id) DO UPDATE SET is_member = 1
+            INSERT INTO users (id, username, full_name, is_member, expired_at)
+            VALUES (?, '', ?, 1, NULL)
+            ON CONFLICT(id) DO UPDATE SET is_member = 1, expired_at = NULL
         """, (user_id, full_name))
         conn.commit()
+
+
+def set_member_vip(user_id: int, days: int, full_name: str = ""):
+    """Set user as VIP member with expiry date"""
+    from datetime import datetime, timedelta
+    expired_at = (datetime.now() + timedelta(days=days)).isoformat()
+    with get_connection() as conn:
+        conn.execute("""
+            INSERT INTO users (id, username, full_name, is_member, expired_at)
+            VALUES (?, '', ?, 1, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                is_member  = 1,
+                expired_at = CASE
+                    WHEN expired_at IS NOT NULL AND expired_at > datetime('now')
+                    THEN datetime(expired_at, '+{} days')
+                    ELSE ?
+                END
+        """.format(days), (user_id, full_name, expired_at, expired_at))
+        conn.commit()
+    return expired_at
+
+
+def get_vip_expiry(user_id: int):
+    """Returns ISO expiry string or None if permanent/not found"""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT expired_at FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row)["expired_at"] if row else None
+
+
+def expire_vip_members():
+    """Batch expire all VIP members whose time has passed. Called on startup/periodic."""
+    with get_connection() as conn:
+        result = conn.execute("""
+            UPDATE users SET is_member = 0, expired_at = NULL
+            WHERE is_member = 1
+              AND expired_at IS NOT NULL
+              AND expired_at < datetime('now')
+        """)
+        conn.commit()
+        return result.rowcount
 
 
 def get_all_member_ids():
@@ -181,6 +245,15 @@ def get_all_user_ids():
     with get_connection() as conn:
         rows = conn.execute("SELECT id FROM users").fetchall()
         return [r["id"] for r in rows]
+
+
+def get_all_users_detail():
+    """Get all users with full details for /daftar command"""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, username, full_name, is_member, joined_at FROM users ORDER BY joined_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def clear_all_db():

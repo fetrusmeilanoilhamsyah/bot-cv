@@ -39,9 +39,14 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_reset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle konfirmasi reset dari admin"""
     query = update.callback_query
-    if not await require_admin(update, context):
+
+    # Safe admin check for callback queries (update.message is None for callbacks)
+    from config import ADMIN_IDS
+    if update.effective_user.id not in ADMIN_IDS:
         await query.answer("Akses ditolak.", show_alert=True)
         return
+
+    await query.answer()  # Always answer immediately to dismiss spinner
 
     data = query.data
 
@@ -64,10 +69,10 @@ async def handle_reset_callback(update: Update, context: ContextTypes.DEFAULT_TY
         # Eksekusi Reset Total
         db.clear_all_db()
         clear_all_sessions()
-        
-        await query.edit_message_text("🚀 **DATABASE RESET BERHASIL!**\nSistem kembali ke kondisi awal.", parse_mode="Markdown")
-        await query.answer("Reset Berhasil", show_alert=True)
+        await query.edit_message_text(
+            "🚀 **DATABASE RESET BERHASIL!**\nSistem kembali ke kondisi awal.",
+            parse_mode="Markdown"
+        )
 
     elif data == "admin_db_reset_cancel":
         await query.edit_message_text("❌ Reset dibatalkan.")
-        await query.answer("Dibatalkan")

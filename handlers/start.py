@@ -1,9 +1,9 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from database import db
-from config import ADMIN_CONTACT, GROUP_LINK, HARGA_MEMBER
 from middleware.session import clear_user_dir
 from handlers.cancel_helper import cancel_all
+from config import ADMIN_CONTACT, TUTORIAL_LINK
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -17,14 +17,43 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Daftarkan user ke database
     db.upsert_user(user.id, user.username or "", user.full_name or "")
 
+    first_name = user.first_name or user.full_name or "Kawan"
+
+    fitur = (
+        "/txttovcf    - konversi file TXT ke VCF\n"
+        "/vcftotxt    - konversi file VCF ke TXT\n"
+        "/admin       - buat file admin/navy VCF\n"
+        "/merge       - gabungkan file VCF\n"
+        "/pecahvcf    - pecah file VCF\n"
+        "/rename      - ganti nama file VCF\n"
+        "/count       - hitung jumlah kontak\n"
+        "/vip         - lihat & daftar paket VIP\n"
+        "/reset       - bersihkan sesi aktif\n"
+        "/done        - selesaikan proses file\n"
+        "─────────────────\n"
+        " KHUSUS ADMIN FEE:\n"
+        "/stat        - lihat statistik & status bot\n"
+        "/daftar      - daftar pengguna bot\n"
+        "/brodcast    - kirim pesan massal\n"
+        "/addvip      - tambah member VIP\n"
+        "/delvip      - copot member VIP\n"
+        "/newmember   - buat member permanen\n"
+        "/delmember   - hapus member permanen\n"
+        "/resetdatabase - bersihkan cache server"
+    )
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("Tutorial Penggunaan Bot", url=TUTORIAL_LINK)
+    ]])
+
+    admin_url = f"https://t.me/{ADMIN_CONTACT.lstrip('@')}"
+
     await update.message.reply_text(
-        f"<b>DIBOT CV FEE</b>\n"
-        f"────────────────────\n"
-        f"Sistem pengolah file VCF otomatis untuk optimasi database kontak Anda.\n\n"
-        f"<b>Akses & Layanan:</b>\n"
-        f"• Admin: {ADMIN_CONTACT}\n"
-        f"• Community: {GROUP_LINK}\n"
-        f"• Membership: {HARGA_MEMBER}\n\n"
-        f"Gunakan menu perintah untuk memulai.",
-        parse_mode="HTML"
+        f"Hallo <b>{first_name}</b>, selamat datang di bot\n"
+        f"Fitur bot:\n"
+        f"<pre>{fitur}</pre>\n"
+        f"Bot milik <a href='{admin_url}'>{ADMIN_CONTACT}</a>",
+        parse_mode="HTML",
+        reply_markup=keyboard,
+        disable_web_page_preview=True
     )

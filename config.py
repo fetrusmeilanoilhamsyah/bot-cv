@@ -8,5 +8,7 @@ ADMIN_IDS     = list(map(int, os.getenv("ADMIN_IDS", "0").split(",")))
 ADMIN_CONTACT = os.getenv("ADMIN_CONTACT", "@admin")
 GROUP_LINK    = os.getenv("GROUP_LINK", "https://t.me/grup")
 HARGA_MEMBER  = os.getenv("HARGA_MEMBER", "Hubungi admin")
+TUTORIAL_LINK = os.getenv("TUTORIAL_LINK", "https://t.me/tutorialnotceve")
 
 TMP_DIR       = os.path.join(os.path.dirname(__file__), "tmp", "sessions")
+

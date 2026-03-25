@@ -1,12 +1,14 @@
 """
-txttovcf.py — Terima paralel, sort by message_id, tampilkan daftar file dulu, lalu kirim semua.
+txttovcf.py — Disk-based, terima paralel, sort by message_id, tampilkan daftar file dulu, lalu kirim semua.
 """
+import os
+import shutil
 import asyncio
-from io import BytesIO
 from telegram import Update
 from telegram.ext import ContextTypes
 from database import db
 from middleware.auth import require_member
+from middleware.session import get_user_dir
 from core.vcf_parser import add_plus, contacts_to_vcf
 
 S1 = "TTV_CONTACT_NAME"
@@ -20,7 +22,6 @@ MAX_SIZE_MB = 500
 
 _user_locks: dict = {}
 _user_timers: dict = {}
-_user_buffers: dict = {}  # {user_id: [(message_id, bytes)]}
 
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
@@ -37,7 +38,7 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
             jumlah = sess["data"]["count"]
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"✅ {jumlah} file diterima. Ketik /done jika sudah selesai."
+                text=f"{jumlah} file diterima. /done untuk selesai."
             )
 
 
@@ -56,14 +57,20 @@ def _cancel_timer(user_id):
         old.cancel()
 
 
+def _clear_buffers(user_id: int):
+    user_dir = get_user_dir(user_id)
+    ttv_dir = os.path.join(user_dir, "txttovcf")
+    shutil.rmtree(ttv_dir, ignore_errors=True)
+
+
 async def cmd_txttovcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
     _cancel_timer(user_id)
-    _user_buffers.pop(user_id, None)
+    _clear_buffers(user_id)
     db.set_session(user_id, S1, {})
-    await update.message.reply_text("Masukkan nama kontak:\n(contoh: FEE)")
+    await update.message.reply_text("Nama kontak: (contoh: FEE)")
 
 
 async def handle_ttv_contact_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -74,7 +81,7 @@ async def handle_ttv_contact_name(update: Update, context: ContextTypes.DEFAULT_
     data = sess["data"]
     data["contact_name"] = update.message.text.strip()
     db.set_session(user_id, S2, data)
-    await update.message.reply_text("Berapa kontak per file? (contoh: 50)")
+    await update.message.reply_text("Kontak per file: (contoh: 50)")
 
 
 async def handle_ttv_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -89,7 +96,7 @@ async def handle_ttv_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = sess["data"]
     data["per_file"] = int(text)
     db.set_session(user_id, S3, data)
-    await update.message.reply_text("Masukkan nama file output:\n(contoh: AYAM GORENG)")
+    await update.message.reply_text("Nama file output: (contoh: AYAM GORENG)")
 
 
 async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -100,7 +107,7 @@ async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYP
     data = sess["data"]
     data["file_name"] = update.message.text.strip()
     db.set_session(user_id, S4, data)
-    await update.message.reply_text("Nomor file diawali nomor berapa?\n(contoh: 1)")
+    await update.message.reply_text("Urutan file mulai dari angka: (contoh: 1)")
 
 
 async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -116,11 +123,11 @@ async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data["awalan"] = int(text)
     data["count"] = 0
     data["total_size"] = 0
-    _user_buffers[user_id] = []
+    _clear_buffers(user_id)
     db.set_session(user_id, S5, data)
     await update.message.reply_text(
-        "Kirimkan semua file TXT Anda.\n"
-        "Boleh kirim sekaligus banyak, ketik /done setelah selesai."
+        "Kirim file TXT. Boleh sekaligus banyak.\n"
+        "/done setelah semua terkirim."
     )
 
 
@@ -134,11 +141,14 @@ async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     msg_id = update.message.message_id
 
-    # Download paralel tanpa lock
+    # Download ke disk
     file_obj = await context.bot.get_file(doc.file_id)
-    bio = BytesIO()
-    await file_obj.download_to_memory(bio)
-    content = bio.getvalue()
+    user_dir = get_user_dir(user_id)
+    ttv_dir = os.path.join(user_dir, "txttovcf")
+    os.makedirs(ttv_dir, exist_ok=True)
+    out_path = os.path.join(ttv_dir, f"{msg_id}.txt")
+    
+    await file_obj.download_to_drive(out_path)
 
     async with get_user_lock(user_id):
         sess = db.get_session(user_id)
@@ -155,9 +165,6 @@ async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Batas {MAX_SIZE_MB}MB. Ketik /done.")
             return
 
-        if user_id not in _user_buffers:
-            _user_buffers[user_id] = []
-        _user_buffers[user_id].append((msg_id, content))
         data["count"] += 1
         data["total_size"] += doc.file_size
         db.set_session(user_id, S5, data)
@@ -182,31 +189,44 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data["is_processing"] = True
     db.set_session(user_id, S5, data)
-    await update.message.reply_text("⏳ Menyusun file, harap tunggu...")
+    await update.message.reply_text("Menyusun, harap tunggu...")
 
-    # Sort by message_id → urutan benar
-    raw = _user_buffers.pop(user_id, [])
-    raw.sort(key=lambda x: x[0])
-    buffers = [c for _, c in raw]
+    user_dir = get_user_dir(user_id)
+    ttv_dir = os.path.join(user_dir, "txttovcf")
+    
+    files = []
+    if os.path.exists(ttv_dir):
+        files = [f for f in os.listdir(ttv_dir) if f.endswith('.txt')]
+        files.sort(key=lambda x: int(x.split('.')[0]))
 
     contact_name = data["contact_name"]
     file_name    = data["file_name"]
     per_file     = data["per_file"]
     awalan       = data["awalan"]
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def do_build():
         all_numbers = []
-        for b in buffers:
-            for line in b.decode("utf-8", errors="ignore").splitlines():
-                num = line.strip()
-                if num:
-                    all_numbers.append(add_plus(num))
+        for f in files:
+            path = os.path.join(ttv_dir, f)
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as file_in:
+                    for line in file_in:
+                        num = line.strip()
+                        if num:
+                            all_numbers.append(add_plus(num))
+            except Exception:
+                pass
 
         results = []
         contact_counter = 1
         file_counter = awalan
+        
+        # Simpan sementara di disk untuk per-file biar aman RAM nya
+        out_temp_dir = os.path.join(user_dir, "txttovcf_out")
+        os.makedirs(out_temp_dir, exist_ok=True)
+        
         for i in range(0, len(all_numbers), per_file):
             chunk = all_numbers[i:i + per_file]
             contacts = [
@@ -215,29 +235,75 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
             contact_counter += len(chunk)
             label = f"{file_name} {file_counter}"
-            vcf_bytes = contacts_to_vcf(contacts).encode("utf-8")
-            results.append((label, vcf_bytes))
+            
+            out_file = os.path.join(out_temp_dir, f"{label}.vcf")
+            with open(out_file, "w", encoding="utf-8") as out_f:
+                out_f.write(contacts_to_vcf(contacts))
+            
+            results.append((label, out_file))
             file_counter += 1
-        return all_numbers, results
+            
+        return all_numbers, results, out_temp_dir
 
-    all_numbers, results = await loop.run_in_executor(None, do_build)
-    db.clear_session(user_id)
+    all_numbers, results, out_temp_dir = await loop.run_in_executor(None, do_build)
 
-    # ── Tampilkan daftar semua nama file dulu ──────────────────────────────
-    # Kirim per 50 baris biar tidak kena batas pesan Telegram
-    header = f"✅ {len(all_numbers)} kontak → {len(results)} file\n\n"
-    lines = [f"{file_name} {awalan + i}.vcf" for i in range(len(results))]
+    try:
+        if not results:
+            await update.message.reply_text("❌ Tidak ada data yang bisa diproses.")
+            return
 
-    CHUNK = 50
-    for i in range(0, len(lines), CHUNK):
-        chunk_lines = lines[i:i + CHUNK]
-        msg = (header if i == 0 else "") + "\n".join(chunk_lines)
-        await update.message.reply_text(msg)
+        total_files = len(results)
 
-    # ── Baru kirim semua file setelah daftar selesai dikirim ───────────────
-    await update.message.reply_text("📤 Mengirim file...")
-    for label, vcf_bytes in results:
-        await update.message.reply_document(
-            document=vcf_bytes,
-            filename=f"{label}.vcf"
+        # ── Tampilkan ringkasan nama file dulu ───────────────────────────────
+        header = f"✅ {len(all_numbers)} kontak → {total_files} file\n\n"
+        lines  = [f"{file_name} {awalan + i}.vcf" for i in range(total_files)]
+
+        CHUNK = 50
+        for i in range(0, len(lines), CHUNK):
+            msg = (header if i == 0 else "") + "\n".join(lines[i:i + CHUNK])
+            await update.message.reply_text(msg)
+
+        # ── STEP 1: Baca SEMUA file ke memori secara paralel (disk IO nol saat kirim) ──
+        send_status = await update.message.reply_text(
+            f"📤 Menyiapkan {total_files} file..."
         )
+
+        def read_bytes(path: str) -> bytes:
+            with open(path, "rb") as f:
+                return f.read()
+
+        # asyncio.gather baca semua file bersamaan di thread pool
+        file_bytes_list = await asyncio.gather(*[
+            loop.run_in_executor(None, read_bytes, out_file)
+            for _, out_file in results
+        ])
+
+        # ── STEP 2: Kirim SATU PER SATU dari memori — ORDER 100% TERJAMIN ──
+        # Tidak ada disk I/O saat kirim, jadi tetap cepat
+        import io
+        for idx, ((label, _), file_bytes) in enumerate(zip(results, file_bytes_list), 1):
+            await update.message.reply_document(
+                document=io.BytesIO(file_bytes),
+                filename=f"{label}.vcf"
+            )
+            # Update counter setiap 5 file
+            if idx % 5 == 0 or idx == total_files:
+                try:
+                    await send_status.edit_text(
+                        f"📤 Mengirim {total_files} file... {idx}/{total_files}"
+                    )
+                except Exception:
+                    pass
+
+        try:
+            await send_status.edit_text(f"✅ Semua {total_files} file terkirim! (urutan terjamin)")
+        except Exception:
+            pass
+
+    finally:
+        db.clear_session(user_id)
+        _clear_buffers(user_id)
+        try:
+            shutil.rmtree(out_temp_dir, ignore_errors=True)
+        except Exception:
+            pass

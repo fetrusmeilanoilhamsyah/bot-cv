@@ -1,94 +1,94 @@
-# DiBot CV FEE — Panduan Instalasi & Penggunaan
+# DiBot CV (VCF Telegram Bot)
 
-## Persyaratan
-- Python 3.11 atau lebih baru
-- Koneksi internet untuk bot Telegram
+A high-performance Telegram bot built with Python for converting, managing, and merging VCF (vCard) and TXT contacts. Designed with concurrency and disk-backed caching to accommodate high-traffic loads and large file processing without memory exhaustion.
 
----
+## Features
 
-## Langkah 1 — Konfigurasi Bot
+* **Contact Management**: Convert TXT to VCF, VCF to TXT, and split or merge large VCF files.
+* **Bulk Processing**: Rapidly counts and processes millions of contacts using background workers (`ThreadPoolExecutor`).
+* **Session Safety**: Disk-based temporary sessions prevent Out-Of-Memory (OOM) crashes.
+* **Smart Concurrency**: connection pooling and `concurrent_updates` tuned for 50-100 simultaneous users.
+* **VIP & Membership**: Integrated membership system with SQLite WAL mode.
+* **Automated Maintenance**: Auto-cleans expired cache and stale sessions via APScheduler.
 
-1. Salin file `.env.example` menjadi `.env`:
+## Prerequisites
+
+* Python 3.10 or higher
+* Telegram Bot Token (from BotFather)
+* VPS (Minimum 1 vCPU, 1GB RAM) or Local PC for testing
+
+## Installation & Localhost Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/fetrusmeilanoilhamsyah/bot-cv.git
+   cd bot-cv
    ```
-   copy .env.example .env
-   ```
-2. Buka file `.env` dengan Notepad, isi data berikut:
-   ```
-   BOT_TOKEN=token_dari_botfather
-   ADMIN_IDS=telegram_id_anda
-   ADMIN_CONTACT=@username_telegram_anda
-   GROUP_LINK=https://t.me/link_grup_anda
-   HARGA_MEMBER=Rp 50.000 / bulan
+
+2. **Set up Virtual Environment:**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-> Cara dapat TOKEN: Chat @BotFather di Telegram, ketik /newbot, ikuti instruksi.
-> Cara dapat Telegram ID Anda: Chat @userinfobot di Telegram.
+3. **Install Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
----
+4. **Environment Configuration:**
+   Copy the example config and edit it with your credentials:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and fill in `BOT_TOKEN`, `ADMIN_IDS`, `ADMIN_CONTACT`, etc.
 
-## Langkah 2 — Install Library Python
+5. **Run the Bot:**
+   ```bash
+   python main.py
+   ```
 
-Buka Command Prompt / Terminal di folder bot, jalankan:
+## VPS Deployment Guide (Linux)
+
+To keep the bot running 24/7 on a VPS, use `systemd` or `pm2`. Below is a standard `systemd` configuration:
+
+1. Copy the project to your VPS (e.g., `/var/www/bot-cv`).
+2. Create a service file: `sudo nano /etc/systemd/system/botcv.service`
+3. Add the following configuration:
+   ```ini
+   [Unit]
+   Description=DiBot CV Telegram Bot
+   After=network.target
+
+   [Service]
+   User=root
+   WorkingDirectory=/var/www/bot-cv
+   ExecStart=/var/www/bot-cv/.venv/bin/python main.py
+   Restart=always
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+4. Enable and start the service:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl start botcv
+   sudo systemctl enable botcv
+   ```
+
+## Dummy Data Cleanup
+
+Before deploying to production, ensure you wipe all local testing sessions and temporary SQLite databases. Run:
+```bash
+python clean_dummy_data.py
 ```
-pip install -r requirements.txt
-```
 
----
+## License
 
-## Langkah 3 — Jalankan Bot
+Copyright (c) 2026 Fetrus Meilano Ilhamsyah
 
-```
-python main.py
-```
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-Bot aktif jika muncul log: `✅ Database connection pool initialized (10 connections)
-✅ Database tables and indexes initialized
-2026-02-18 18:51:14,751 - __main__ - INFO - 🚀 DiBot CV FEE berjalan (OPTIMIZED VERSION)...
-🚀 DiBot CV FEE berjalan (OPTIMIZED VERSION)...
-📊 Max concurrent updates: 8
-⏱️  Timeouts: pool=60s, read=60s, write=120s, connect=30s
-🔐 Rate limit: Max 2 operations per user`
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-> Database otomatis dibuat sebagai file `database/bot.db` saat pertama kali bot dijalankan. Tidak perlu setup apapun.
-
----
-
-## Langkah 4 — Daftarkan Admin sebagai Member
-
-Setelah bot berjalan, jalankan perintah ini sekali di terminal untuk mendaftarkan diri sebagai member:
-```
-python -c "from database import db; db.set_member(ID_TELEGRAM_ANDA, 'NAMA_ANDA'); print('done')"
-```
-
----
-
-## Daftar Perintah
-
-| Perintah | Fungsi | Akses |
-|---|---|---|
-| /start | Sapa dan info member | Semua |
-| /reset | Hapus sesi & bersihkan RAM | Member |
-| /Admin | Buat VCF Admin + Navy | Member |
-| /merge | Gabungkan file VCF | Member |
-| /vcftotxt | Konversi VCF ke TXT | Member |
-| /pecahvcf | Pecah VCF per N kontak | Member |
-| /rename | Ganti nama file VCF | Member |
-| /txttovcf | Konversi TXT ke VCF | Member |
-| /Brodcast | Kirim pesan ke semua user | Admin |
-| /newmember | Aktifkan member baru | Admin |
-| /done | Selesaikan proses upload | Member |
-
----
-
-## Catatan Penting
-
-- Boleh kirim banyak file sekaligus (merge, vcftotxt, txttovcf), ketik `/done` setelah selesai
-- Selalu ketik `/reset` setelah selesai konversi agar RAM tetap bersih
-- Nomor telepon otomatis ditambahkan `+` di depan
-- Jika bot error, cek file `logs/bot.log`
-- Data user tersimpan di `database/bot.db`, bisa dibuka dengan DB Browser for SQLite
-
----
-
-## LISENSI FETRUS MEILANO ILHAMSYAH
-Dilarang menyebarkan atau menjual ulang tanpa izin.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

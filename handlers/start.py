@@ -22,6 +22,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fitur = (
         "/txttovcf    - konversi file TXT ke VCF\n"
         "/vcftotxt    - konversi file VCF ke TXT\n"
+        "/xlsxtotxt   - ekstrak kontak dari Excel/CSV\n"
         "/admin       - buat file admin/navy VCF\n"
         "/merge       - gabungkan file VCF\n"
         "/pecahvcf    - pecah file VCF\n"

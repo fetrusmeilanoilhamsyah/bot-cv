@@ -51,6 +51,12 @@ from handlers.count import (
     handle_count_file,
     handle_count_done,
 )
+from handlers.xlsxtotxt import (
+    STATE as XLSX2TXT_STATE,
+    cmd_xlsxtotxt,
+    handle_xlsxtotxt_file,
+    handle_xlsxtotxt_done,
+)
 from handlers.pecahvcf import (
     cmd_pecahvcf,
     handle_pecah_per_file,
@@ -171,7 +177,7 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     state = sess.get("state")
 
-    if update.message.text and update.message.text.strip().lower() in ["selesai", "done"]:
+    if update.message and update.message.text and update.message.text.strip().lower() in ["selesai", "done"]:
         await done_router(update, context)
         return
 
@@ -204,6 +210,8 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     sess = db.get_session(user_id)
+    if not sess:
+        return
     state = sess.get("state")
 
     if state == MERGE_STATE:
@@ -218,7 +226,8 @@ async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_ttv_file(update, context)
     elif state == COUNT_STATE:
         await handle_count_file(update, context)
-
+    elif state == XLSX2TXT_STATE:
+        await handle_xlsxtotxt_file(update, context)
 
 # The done_router function is now integrated into text_router for "selesai", "/done", "done" messages.
 # However, the CommandHandler("done", ...) still needs a function.
@@ -226,6 +235,9 @@ async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def done_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     sess = db.get_session(user_id)
+    if not sess:
+        await update.message.reply_text("Tidak ada proses aktif.")
+        return
     state = sess.get("state")
 
     if state == MERGE_STATE:
@@ -236,6 +248,8 @@ async def done_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_ttv_done(update, context)
     elif state == COUNT_STATE:
         await handle_count_done(update, context)
+    elif state == XLSX2TXT_STATE:
+        await handle_xlsxtotxt_done(update, context)
     else:
         await update.message.reply_text("Tidak ada proses aktif yang bisa diselesaikan.")
 
@@ -261,6 +275,7 @@ def main():
     app.add_handler(CommandHandler(["reset", "resetdatabase"], rate_limiter(cmd_reset)))
     app.add_handler(CommandHandler(["admin", "Admin"], rate_limiter(cmd_admin)))
     app.add_handler(CommandHandler("txttovcf", rate_limiter(cmd_txttovcf)))
+    app.add_handler(CommandHandler("xlsxtotxt", rate_limiter(cmd_xlsxtotxt)))
     app.add_handler(CommandHandler("merge", rate_limiter(cmd_merge)))
     app.add_handler(CommandHandler("vcftotxt", rate_limiter(cmd_vcftotxt)))
     app.add_handler(CommandHandler("pecahvcf", rate_limiter(cmd_pecahvcf)))

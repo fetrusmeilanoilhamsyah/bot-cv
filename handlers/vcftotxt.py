@@ -17,6 +17,7 @@ _user_status_msg: dict = {}
 _user_bg_tasks: dict = {}
 _user_last_edit: dict = {}
 _user_locks: dict = {}
+_user_locks: dict = {}
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in _user_locks:

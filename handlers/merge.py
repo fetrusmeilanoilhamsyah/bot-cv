@@ -22,6 +22,7 @@ MAX_SIZE_MB = 500
 _user_status_msg: dict = {}  # {user_id: message_id}
 _user_bg_tasks: dict = {}   # {user_id: set(tasks)}
 _user_last_edit: dict = {}  # {user_id: float}
+_user_locks: dict = {}      # {user_id: Lock}
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in _user_locks:
@@ -140,21 +141,6 @@ async def handle_merge_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Berhasil menerima {data['count']} file. Berikan nama untuk file gabungan:")
 
 
-async def handle_merge_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    _cancel_timer(user_id)
-
-    sess = db.get_session(user_id)
-    if sess["state"] != STATE:
-        return
-    data = sess["data"]
-
-    if data["count"] == 0:
-        await update.message.reply_text("Belum ada file yang dikirim.")
-        return
-
-    db.set_session(user_id, STATE_NAMING, data)
-    await update.message.reply_text(f"Berhasil menerima {data['count']} file. Mau dikasih nama apa file gabungannya?")
 
 
 async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -11,7 +11,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import parse_vcf_file, contacts_to_vcf
-from core.utils import sanitize_filename, get_progress_bar
+from core.utils import sanitize_filename
 
 STATE        = "MERGE_COLLECTING"
 STATE_NAMING = "MERGE_NAMING"
@@ -19,146 +19,120 @@ STATE_NAMING = "MERGE_NAMING"
 MAX_FILES   = 40096
 MAX_SIZE_MB = 500
 
-_user_status_msg: dict = {}  # {user_id: message_id}
-_user_bg_tasks: dict = {}   # {user_id: set(tasks)}
-_user_last_edit: dict = {}  # {user_id: float}
-_user_locks: dict = {}      # {user_id: Lock}
+_user_locks: dict = {}
+_user_timers: dict = {}
+
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in _user_locks:
         _user_locks[user_id] = asyncio.Lock()
     return _user_locks[user_id]
 
-async def _bg_download(context, file_id: str, out_path: str, user_id: int):
-    """Worker untuk download di background."""
-    try:
-        file_obj = await context.bot.get_file(file_id)
-        await file_obj.download_to_drive(out_path)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"BG Download error user {user_id}: {e}")
-    finally:
-        # Hapus diri sendiri dari set task
-        if user_id in _user_bg_tasks:
-            _user_bg_tasks[user_id].discard(asyncio.current_task())
 
-async def _delete_old_status(user_id: int, context):
-    msg_id = _user_status_msg.pop(user_id, None)
-    if msg_id:
-        try: await context.bot.delete_message(chat_id=user_id, message_id=msg_id)
-        except: pass
+async def _debounce_notify(user_id: int, context, chat_id: int):
+    await asyncio.sleep(3)
+    if _user_timers.get(user_id) is asyncio.current_task():
+        sess = db.get_session(user_id)
+        if sess and sess.get("state") == STATE:
+            jumlah = sess["data"]["count"]
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"{jumlah} file diterima. /done jika selesai."
+            )
+
+
+def _reset_timer(user_id: int, context, chat_id: int):
+    old = _user_timers.get(user_id)
+    if old:
+        old.cancel()
+    _user_timers[user_id] = asyncio.ensure_future(
+        _debounce_notify(user_id, context, chat_id)
+    )
+
+
+def _cancel_timer(user_id: int):
+    old = _user_timers.pop(user_id, None)
+    if old:
+        old.cancel()
+
 
 def _clear_buffers(user_id: int):
     user_dir = get_user_dir(user_id)
     merge_dir = os.path.join(user_dir, "merge")
     shutil.rmtree(merge_dir, ignore_errors=True)
-    _user_last_edit.pop(user_id, None)
+
 
 async def cmd_merge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
     db.increment_usage(user_id)
-    await _delete_old_status(user_id, context)
+    _cancel_timer(user_id)
     _clear_buffers(user_id)
     db.set_session(user_id, STATE, {"count": 0, "total_size": 0})
     await update.message.reply_text(
-        "⚡ **MODE MERGE AKTIF**\nKirim file VCF.\nKetik /done jika selesai."
+        "Kirim file VCF.\nKetik /done jika selesai."
     )
+
 
 async def handle_merge_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     doc = update.message.document
-    msg_id = update.message.message_id
+    msg_id = update.message.message_id  # ← urutan Telegram, selalu naik
 
     sess = db.get_session(user_id)
-    if not sess or sess.get("state") != STATE:
+    if sess["state"] != STATE:
         return
 
-    # 1. Register background download
+    # Download paralel ke disk — menghindari RAM penuh
+    file_obj = await context.bot.get_file(doc.file_id)
     user_dir = get_user_dir(user_id)
     merge_dir = os.path.join(user_dir, "merge")
     os.makedirs(merge_dir, exist_ok=True)
     out_path = os.path.join(merge_dir, f"{msg_id}.vcf")
     
-    if user_id not in _user_bg_tasks:
-        _user_bg_tasks[user_id] = set()
-    
-    task = asyncio.create_task(_bg_download(context, doc.file_id, out_path, user_id))
-    _user_bg_tasks[user_id].add(task)
+    await file_obj.download_to_drive(out_path)
 
-    # 2. Update Session (Locked)
+    # Lock hanya saat update session
     async with get_user_lock(user_id):
         sess = db.get_session(user_id)
+        if sess["state"] != STATE:
+            return
         data = sess["data"]
+
+        if data["count"] >= MAX_FILES:
+            await update.message.reply_text(f"Batas {MAX_FILES} file tercapai. Ketik /done.")
+            return
+
+        if (data["total_size"] + doc.file_size) / (1024 * 1024) > MAX_SIZE_MB:
+            await update.message.reply_text(f"Batas ukuran {MAX_SIZE_MB}MB tercapai. Ketik /done.")
+            return
+
         data["count"] += 1
         data["total_size"] += doc.file_size
         db.set_session(user_id, STATE, data)
-        count = data["count"]
 
-    # 3. Throttled UI Update
-    import time
-    now = time.time()
-    last = _user_last_edit.get(user_id, 0)
-    received = len(_user_bg_tasks.get(user_id, set()))
-    
-    if user_id not in _user_status_msg:
-        msg = await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"📥 **Menerima file...** ({received})\n⚙️ Memproses... {get_progress_bar(count, received or 1)}",
-            disable_notification=True
-        )
-        _user_status_msg[user_id] = msg.message_id
-        _user_last_edit[user_id] = now
-    elif now - last > 2.0 or count == received:
-        try:
-            bar = get_progress_bar(count, received or 1)
-            status_text = (
-                f"📥 **Menerima:** {received} file\n"
-                f"⚙️ **Status:** {count}/{received} file terproses\n"
-                f"{bar}\n\n"
-            )
-            if count == received and received > 0:
-                status_text += "📂 **Siap!** Ketik /done untuk lanjut."
-            else:
-                status_text += "Ketik /done jika sudah semua."
-                
-            await context.bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=_user_status_msg[user_id],
-                text=status_text
-            )
-            _user_last_edit[user_id] = now
-        except Exception:
-            pass
+    _reset_timer(user_id, context, chat_id)
+
 
 async def handle_merge_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    _cancel_timer(user_id)
+
     sess = db.get_session(user_id)
-    if not sess or sess.get("state") != STATE:
+    if sess["state"] != STATE:
         return
-    
-    # Tunggu semua background download selesai
-    tasks = _user_bg_tasks.get(user_id, set())
-    if tasks:
-        wait_msg = await update.message.reply_text("Menyelesaikan unduhan... Mohon tunggu.")
-        await asyncio.gather(*tasks, return_exceptions=True)
-        try: await wait_msg.delete() 
-        except: pass
-    
-    _user_bg_tasks.pop(user_id, None)
-    await _delete_old_status(user_id, context)
-    
     data = sess["data"]
+
     if data["count"] == 0:
-        await update.message.reply_text("🚫 Belum ada file yang dikirim.")
+        await update.message.reply_text("Belum ada file yang dikirim.")
         return
 
     db.set_session(user_id, STATE_NAMING, data)
-    await update.message.reply_text(f"✅ Berhasil menerima {data['count']} file.\nBerikan nama untuk file gabungan:")
-
-
+    await update.message.reply_text(
+        f"{data['count']} file diterima. Nama file:"
+    )
 
 
 async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE):

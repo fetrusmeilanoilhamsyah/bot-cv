@@ -10,7 +10,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     # Cancel semua proses aktif user saat /start
-    await cancel_all(user.id, context)
+    cancel_all(user.id)
     db.clear_session(user.id)
     clear_user_dir(user.id)
 

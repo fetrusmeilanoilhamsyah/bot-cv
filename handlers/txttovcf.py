@@ -257,7 +257,7 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_files = len(results)
 
         # ── Tampilkan ringkasan nama file dulu ───────────────────────────────
-        header = f"{len(all_numbers)} kontak -> {total_files} file\n"
+        header = f"{header if 'header' in locals() else ''}{len(all_numbers)} kontak -> {total_files} file\n"
         lines  = [f"{file_name} {awalan + i}.vcf" for i in range(total_files)]
 
         CHUNK = 50
@@ -280,7 +280,6 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
 
         # ── STEP 2: Kirim SATU PER SATU dari memori — ORDER 100% TERJAMIN ──
-        # Tidak ada disk I/O saat kirim, jadi tetap cepat
         import io
         for idx, ((label, _), file_bytes) in enumerate(zip(results, file_bytes_list), 1):
             await update.message.reply_document(
@@ -288,26 +287,6 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename=f"{label}.vcf"
             )
             # Update counter setiap 5 file
-            if idx % 5 == 0 or idx == total_files:
-                try:
-                    await send_status.edit_text(
-                        f"Mengirim {total_files} file... {idx}/{total_files}"
-                    )
-                except Exception:
-                    pass
-
-        try:
-            await send_status.edit_text(f"Selesai. {total_files} file terkirim.")
-        except Exception:
-            pass
-
-    finally:
-        db.clear_session(user_id)
-        _clear_buffers(user_id)
-        try:
-            shutil.rmtree(out_temp_dir, ignore_errors=True)
-        except Exception:
-            passdate counter setiap 5 file
             if idx % 5 == 0 or idx == total_files:
                 try:
                     await send_status.edit_text(

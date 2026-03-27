@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from database import db
 from middleware.session import get_user_dir, clear_user_dir
+from core.utils import get_progress_bar
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,12 @@ _user_status_msg: dict = {}
 _user_bg_tasks: dict = {}
 _user_last_edit: dict = {}
 _user_locks: dict = {}
+
+async def _delete_old_status(user_id: int, context):
+    msg_id = _user_status_msg.pop(user_id, None)
+    if msg_id:
+        try: await context.bot.delete_message(chat_id=user_id, message_id=msg_id)
+        except: pass
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in _user_locks:
@@ -69,14 +76,13 @@ async def _bg_process(context, file_id: str, file_path: str, ext: str, user_id: 
 async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db.increment_usage(user_id)
+    await _delete_old_status(user_id, context)
     clear_user_dir(user_id)
-    _user_status_msg.pop(user_id, None)
     _user_last_edit.pop(user_id, None)
-    _user_bg_tasks.pop(user_id, None)
     
     db.set_session(user_id, STATE, {"total_kontak": 0, "total_file": 0})
     await update.message.reply_text(
-        "Kirim file TXT atau VCF.\nKlik /done jika selesai."
+        "📊 **MODE HITUNG KONTAK AKTIF**\nKirim file TXT atau VCF.\nKlik /done jika selesai."
     )
 
 async def handle_count_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,22 +121,37 @@ async def handle_count_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import time
     now = time.time()
     last = _user_last_edit.get(user_id, 0)
+    received = len(_user_bg_tasks.get(user_id, set()))
     
     if user_id not in _user_status_msg:
         msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"Menerima file... ({len(_user_bg_tasks[user_id])})",
+            text=f"📥 **Menerima file...** ({received})\n⚙️ Memproses... {get_progress_bar(0, received or 1)}",
             disable_notification=True
         )
         _user_status_msg[user_id] = msg.message_id
         _user_last_edit[user_id] = now
-    elif now - last > 2.0 or len(_user_bg_tasks[user_id]) % 10 == 0:
+    elif now - last > 2.0 or count == received:
         try:
             curr_data = db.get_session(user_id)["data"]
+            proc = curr_data['total_file']
+            bar = get_progress_bar(proc, received or 1)
+            
+            status_text = (
+                f"📥 **Menerima:** {received} file\n"
+                f"⚙️ **Status:** {proc}/{received} file terproses\n"
+                f"👥 **Total Kontak:** {curr_data['total_kontak']}\n"
+                f"{bar}\n\n"
+            )
+            if proc == received and received > 0:
+                status_text += "📂 **Siap!** Ketik /done untuk hasil akhir."
+            else:
+                status_text += "Ketik /done jika sudah semua."
+
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=_user_status_msg[user_id],
-                text=f"Menerima & Menghitung... ({curr_data['total_file']} file, {curr_data['total_kontak']} kontak)\nKetik /done jika sudah semua."
+                text=status_text
             )
             _user_last_edit[user_id] = now
         except Exception:
@@ -151,6 +172,7 @@ async def handle_count_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     
     _user_bg_tasks.pop(user_id, None)
+    await _delete_old_status(user_id, context)
     data = db.get_session(user_id)["data"]
     
     await update.message.reply_text(

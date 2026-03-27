@@ -12,7 +12,7 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     # Cancel semua proses aktif + bersihkan RAM
-    cancel_all(user_id)
+    await cancel_all(user_id, context)
     db.clear_session(user_id)
     clear_user_dir(user_id)
 

@@ -10,7 +10,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import parse_vcf_file
-from core.utils import sanitize_filename
+from core.utils import sanitize_filename, get_progress_bar
 
 STATE        = "VCF2TXT_COLLECTING"
 STATE_NAMING = "VCF2TXT_NAMING"
@@ -38,11 +38,17 @@ async def _bg_download(context, file_id: str, out_path: str, user_id: int):
         if user_id in _user_bg_tasks:
             _user_bg_tasks[user_id].discard(asyncio.current_task())
 
+async def _delete_old_status(user_id: int, context):
+    msg_id = _user_status_msg.pop(user_id, None)
+    if msg_id:
+        try: await context.bot.delete_message(chat_id=user_id, message_id=msg_id)
+        except: pass
 
 def _clear_buffers(user_id: int):
     user_dir = get_user_dir(user_id)
     v2t_dir = os.path.join(user_dir, "vcftotxt")
     shutil.rmtree(v2t_dir, ignore_errors=True)
+    _user_last_edit.pop(user_id, None)
 
 
 
@@ -52,10 +58,11 @@ async def cmd_vcftotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.increment_usage(user_id)
+    await _delete_old_status(user_id, context)
     _clear_buffers(user_id)
     db.set_session(user_id, STATE, {"count": 0, "total_size": 0})
     await update.message.reply_text(
-        "Kirim file VCF.\nKetik /done jika selesai."
+        "📂 **MODE VCF KE TXT AKTIF**\nKirim file VCF.\nKetik /done jika selesai."
     )
 
 
@@ -94,21 +101,33 @@ async def handle_vcftotxt_file(update: Update, context: ContextTypes.DEFAULT_TYP
     import time
     now = time.time()
     last = _user_last_edit.get(user_id, 0)
+    received = len(_user_bg_tasks.get(user_id, set()))
     
     if user_id not in _user_status_msg:
         msg = await context.bot.send_message(
             chat_id=chat_id,
-            text=f"Menerima file... ({count})",
+            text=f"📥 **Menerima file...** ({received})\n⚙️ Memproses... {get_progress_bar(count, received or 1)}",
             disable_notification=True
         )
         _user_status_msg[user_id] = msg.message_id
         _user_last_edit[user_id] = now
-    elif now - last > 2.0 or count % 10 == 0:
+    elif now - last > 2.0 or count == received:
         try:
+            bar = get_progress_bar(count, received or 1)
+            status_text = (
+                f"📥 **Menerima:** {received} file\n"
+                f"⚙️ **Status:** {count}/{received} file terproses\n"
+                f"{bar}\n\n"
+            )
+            if count == received and received > 0:
+                status_text += "📂 **Siap!** Ketik /done untuk lanjut."
+            else:
+                status_text += "Ketik /done jika sudah semua."
+                
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=_user_status_msg[user_id],
-                text=f"Menerima file... ({count})\nKetik /done jika sudah semua."
+                text=status_text
             )
             _user_last_edit[user_id] = now
         except Exception:
@@ -130,13 +149,15 @@ async def handle_vcftotxt_done(update: Update, context: ContextTypes.DEFAULT_TYP
         except: pass
     
     _user_bg_tasks.pop(user_id, None)
+    await _delete_old_status(user_id, context)
+    
     data = sess["data"]
     if data["count"] == 0:
-        await update.message.reply_text("Belum ada file yang dikirim.")
+        await update.message.reply_text("🚫 Belum ada file yang dikirim.")
         return
 
     db.set_session(user_id, STATE_NAMING, data)
-    await update.message.reply_text(f"Berhasil menerima {data['count']} file. Berikan nama untuk hasil TXT:")
+    await update.message.reply_text(f"✅ Berhasil menerima {data['count']} file.\nBerikan nama untuk hasil TXT:")
 
 
 async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_TYPE):

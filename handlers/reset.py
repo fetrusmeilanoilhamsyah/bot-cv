@@ -11,14 +11,17 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
 
-    # Cancel semua proses aktif + bersihkan RAM
-    cancel_all(user_id)
-    db.clear_session(user_id)
-    clear_user_dir(user_id)
-
     await update.message.reply_text(
         "Sesi dibersihkan."
     )
+
+    # Cleanup di background agar tidak delay
+    async def cleanup_bg():
+        cancel_all(user_id)
+        db.clear_session(user_id)
+        clear_user_dir(user_id)
+    
+    asyncio.create_task(cleanup_bg())
 
     # Menu Tambahan buat Admin
     from config import ADMIN_IDS

@@ -172,45 +172,7 @@ async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    sess = db.get_session(user_id)
-    if sess["state"] != S5:
-        return
-
-    doc = update.message.document
-    msg_id = update.message.message_id
-
-    # Download ke disk
-    file_obj = await context.bot.get_file(doc.file_id)
-    user_dir = get_user_dir(user_id)
-    ttv_dir = os.path.join(user_dir, "txttovcf")
-    os.makedirs(ttv_dir, exist_ok=True)
-    out_path = os.path.join(ttv_dir, f"{msg_id}.txt")
-    
-    await file_obj.download_to_drive(out_path)
-
-    async with get_user_lock(user_id):
-        sess = db.get_session(user_id)
-        if sess["state"] != S5:
-            return
-        data = sess["data"]
-
-        if data.get("is_processing"):
-            return
-        if data["count"] >= MAX_FILES:
-            await update.message.reply_text(f"Batas {MAX_FILES} file. Ketik /done.")
-            return
-        if (data["total_size"] + doc.file_size) / (1024 * 1024) > MAX_SIZE_MB:
-            await update.message.reply_text(f"Batas {MAX_SIZE_MB}MB. Ketik /done.")
-            return
-
-        data["count"] += 1
-        data["total_size"] += doc.file_size
-        db.set_session(user_id, S5, data)
-
-    _reset_timer(user_id, context, chat_id)
+# handle_ttv_file moved to top with background task logic
 
 
 async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):

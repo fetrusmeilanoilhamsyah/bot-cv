@@ -45,10 +45,6 @@ def _clear_buffers(user_id: int):
     shutil.rmtree(v2t_dir, ignore_errors=True)
 
 
-def _clear_buffers(user_id: int):
-    user_dir = get_user_dir(user_id)
-    v2t_dir = os.path.join(user_dir, "vcftotxt")
-    shutil.rmtree(v2t_dir, ignore_errors=True)
 
 
 async def cmd_vcftotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):

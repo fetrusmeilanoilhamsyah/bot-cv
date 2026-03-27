@@ -29,14 +29,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
     first_name = user.first_name or user.full_name or "Kawan"
-    bot_info = await context.bot.get_me()
-    bot_username = bot_info.username
+    bot_username = context.bot.username or "Bot"
 
     msg = (
         f"Halo {first_name}!\n"
-        "Gunakan bot ini untuk mengelola kontak VCF/TXT.\n\n"
-        f"Link Referral Kamu:\n`t.me/{bot_username}?start=ref_{user.id}`\n"
-        "Dapatkan bonus +2 hari VIP setiap kali teman yang diundang berlangganan!"
+        f"Referral: `t.me/{bot_username}?start=ref_{user.id}` (+2 hari VIP)"
     )
     fitur = (
         "/txttovcf    - konversi file TXT ke VCF\n"

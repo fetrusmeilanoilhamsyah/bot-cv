@@ -65,6 +65,7 @@ async def cmd_vcftotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     _cancel_timer(user_id)
     _clear_buffers(user_id)
     db.set_session(user_id, STATE, {"count": 0, "total_size": 0})

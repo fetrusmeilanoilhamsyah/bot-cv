@@ -81,6 +81,9 @@ async def cmd_delvip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    user_id = update.effective_user.id
+    db.increment_usage(user_id)
+
     target_id = int(args[0])
     user = db.get_user(target_id)
     if not user or not user["is_member"]:

@@ -88,6 +88,11 @@ from handlers.broadcast import (
     handle_broadcast_msg,
     STATE as BROADCAST_STATE,
 )
+from handlers.media_broadcast import (
+    cmd_media_broadcast,
+    handle_broadcast_media,
+    STATE as MEDIA_BROADCAST_STATE,
+)
 from handlers.new_member import (
     cmd_newmember,
     handle_newmember_id,
@@ -207,6 +212,8 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_newmember_id(update, context)
     elif state == DELMEMBER_STATE:
         await handle_delmember_id(update, context)
+    elif state == MEDIA_BROADCAST_STATE:
+        await handle_broadcast_media(update, context)
 
 
 async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -284,6 +291,7 @@ def main():
     app.add_handler(CommandHandler("rename", rate_limiter(cmd_rename)))
     app.add_handler(CommandHandler("count", rate_limiter(cmd_count)))
     app.add_handler(CommandHandler(["broadcast", "brodcast", "Brodcast"], rate_limiter(cmd_broadcast)))
+    app.add_handler(CommandHandler("mediabroadcast", rate_limiter(cmd_media_broadcast)))
     app.add_handler(CommandHandler("newmember", rate_limiter(cmd_newmember)))
     app.add_handler(CommandHandler(["delmember", "copotmember"], rate_limiter(cmd_delmember)))
     app.add_handler(CommandHandler("daftar", rate_limiter(cmd_daftar)))
@@ -361,8 +369,23 @@ def main():
         if cleaned:
             logger.info("[JOB] Cleaned %d stuck session dirs", cleaned)
 
+    async def job_notify_expiry(context):
+        """Setiap 1 jam — cek user yang akan habis masa berlakunya dalam 24 jam"""
+        users = db.get_users_for_expiry_notif()
+        for u in users:
+            uid = u["id"]
+            try:
+                await context.bot.send_message(
+                    chat_id=uid,
+                    text="Pemberitahuan: Masa aktif VIP kamu tinggal 24 jam lagi. Yuk perpanjang agar fitur premium tetap aktif."
+                )
+                db.mark_expiry_notified(uid)
+            except Exception:
+                pass
+
     app.job_queue.run_repeating(job_expire_vip,    interval=3600, first=60)
     app.job_queue.run_repeating(job_cleanup_sessions, interval=1800, first=120)
+    app.job_queue.run_repeating(job_notify_expiry,   interval=3600, first=300)
     # ───────────────────────────────────────────────────────────────────────────
 
     app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)

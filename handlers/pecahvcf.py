@@ -21,6 +21,7 @@ async def cmd_pecahvcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     db.set_session(user_id, STATE_PER_FILE, {})
     await update.message.reply_text("Kontak per file: (misal: 50)")
 

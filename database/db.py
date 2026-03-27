@@ -85,7 +85,10 @@ def init_db():
                 is_member   INTEGER DEFAULT 0,
                 joined_at   TEXT    DEFAULT (datetime('now')),
                 last_active TEXT    DEFAULT (datetime('now')),
-                expired_at  TEXT    DEFAULT NULL
+                expired_at  TEXT    DEFAULT NULL,
+                referred_by INTEGER DEFAULT NULL,
+                usage_count INTEGER DEFAULT 0,
+                expiry_notified INTEGER DEFAULT 0
             )
         """)
         
@@ -95,7 +98,16 @@ def init_db():
             conn.commit()
             print("✅ Migrated: added expired_at column")
         except Exception:
-            pass  # Column already exists — no action needed
+            pass  # Column already exists
+            
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER DEFAULT NULL")
+            conn.execute("ALTER TABLE users ADD COLUMN usage_count INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE users ADD COLUMN expiry_notified INTEGER DEFAULT 0")
+            conn.commit()
+            print("✅ Migrated: added referral and analytics columns")
+        except Exception:
+            pass
         
         conn.execute("""
             CREATE TABLE IF NOT EXISTS broadcast_log (
@@ -112,6 +124,8 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_member ON users(is_member)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_active ON users(last_active)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_expiry ON users(expired_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_ref ON users(referred_by)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_users_usage ON users(usage_count)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_broadcast_admin ON broadcast_log(admin_id)")
         
         conn.commit()
@@ -144,6 +158,51 @@ def upsert_user(user_id: int, username: str, full_name: str):
                 full_name   = excluded.full_name,
                 last_active = excluded.last_active
         """, (user_id, username, full_name, datetime.now().isoformat()))
+        conn.commit()
+
+def increment_usage(user_id: int):
+    """Increment user activity counter"""
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET usage_count = usage_count + 1, last_active = ? WHERE id = ?", 
+                    (datetime.now().isoformat(), user_id))
+        conn.commit()
+
+def set_referrer(user_id: int, referrer_id: int):
+    """Set who referred this user (only once)"""
+    if user_id == referrer_id: return
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET referred_by = ? WHERE id = ? AND referred_by IS NULL", (referrer_id, user_id))
+        conn.commit()
+
+def get_referrer(user_id: int):
+    """Get the ID of the person who referred this user"""
+    with get_connection() as conn:
+        row = conn.execute("SELECT referred_by FROM users WHERE id = ?", (user_id,)).fetchone()
+        return row["referred_by"] if row else None
+
+def get_top_users(limit=5):
+    """Get top active users for leaderboard"""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT full_name, usage_count FROM users ORDER BY usage_count DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+def get_users_for_expiry_notif():
+    """Get users who expire in ~24 hours and haven't been notified"""
+    # Mencari yang expired_at antara 23 jam sampai 25 jam ke depan
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT id, expired_at FROM users 
+            WHERE is_member = 1 
+              AND expiry_notified = 0 
+              AND expired_at IS NOT NULL
+              AND expired_at BETWEEN datetime('now', '+23 hours') AND datetime('now', '+25 hours')
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+def mark_expiry_notified(user_id: int):
+    """Mark that user has been notified about expiry"""
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET expiry_notified = 1 WHERE id = ?", (user_id,))
         conn.commit()
 
 

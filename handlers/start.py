@@ -15,10 +15,29 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clear_user_dir(user.id)
 
     # Daftarkan user ke database
-    db.upsert_user(user.id, user.username or "", user.full_name or "")
+    db.upsert_user(user.id, user.username or "", user.full_name)
+    db.increment_usage(user.id)
+
+    # Cek referral: /start ref_ID
+    if context.args and len(context.args) > 0:
+        arg = context.args[0]
+        if arg.startswith("ref_"):
+            try:
+                referrer_id = int(arg.replace("ref_", ""))
+                db.set_referrer(user.id, referrer_id)
+            except ValueError:
+                pass
 
     first_name = user.first_name or user.full_name or "Kawan"
+    bot_info = await context.bot.get_me()
+    bot_username = bot_info.username
 
+    msg = (
+        f"Halo {first_name}!\n"
+        "Gunakan bot ini untuk mengelola kontak VCF/TXT.\n\n"
+        f"Link Referral Kamu:\n`t.me/{bot_username}?start=ref_{user.id}`\n"
+        "Dapatkan bonus +2 hari VIP setiap kali teman yang diundang berlangganan!"
+    )
     fitur = (
         "/txttovcf    - konversi file TXT ke VCF\n"
         "/vcftotxt    - konversi file VCF ke TXT\n"
@@ -35,7 +54,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         " KHUSUS ADMIN FEE:\n"
         "/stat        - lihat statistik & status bot\n"
         "/daftar      - daftar pengguna bot\n"
-        "/brodcast    - kirim pesan massal\n"
+        "/brodcast    - kirim pesan massal (Teks)\n"
+        "/mediabroadcast - kirim pesan massal (Media/Foto/Video)\n"
         "/addvip      - tambah member VIP\n"
         "/delvip      - copot member VIP\n"
         "/newmember   - buat member permanen\n"
@@ -51,6 +71,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"<b>{first_name}</b>\n\n"
+        f"{msg}\n\n"
         f"Fitur:\n"
         f"<pre>{fitur}</pre>\n"
         f"Owner: <a href='{admin_url}'>{ADMIN_CONTACT}</a>",

@@ -46,6 +46,15 @@ async def cmd_stat(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
 
     tmp_size_mb = tmp_size / (1024 * 1024)
+    
+    # Leaderboard Top 5
+    top_users = db.get_top_users(5)
+    lb_text = "\n\nLEADERBOARD (Top Active):\n"
+    if top_users:
+        for idx, u in enumerate(top_users, 1):
+            lb_text += f"{idx}. {u['full_name']} ({u['usage_count']}x)\n"
+    else:
+        lb_text += "Belum ada data."
 
     await update.message.reply_text(
         f"STATISTIK\n"
@@ -54,4 +63,5 @@ async def cmd_stat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Member: {members} (P:{members-vip_timed}, V:{vip_timed})\n"
         f"Non-member: {non_mem}\n"
         f"Tmp: {tmp_count} file ({tmp_size_mb:.2f} MB)"
+        + lb_text
     )

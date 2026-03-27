@@ -32,6 +32,7 @@ def _count_contacts_sync(filepath: str, ext: str) -> int:
 
 async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     
     # Bersihkan sisa direktori sisa proses sebelumnya
     clear_user_dir(user_id)

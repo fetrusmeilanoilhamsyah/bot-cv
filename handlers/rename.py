@@ -18,6 +18,7 @@ async def cmd_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     db.set_session(user_id, STATE_NAME, {})
     await update.message.reply_text("Nama file:")
 

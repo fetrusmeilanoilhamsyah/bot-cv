@@ -68,6 +68,7 @@ async def cmd_txttovcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_member(update, context):
         return
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     _cancel_timer(user_id)
     _clear_buffers(user_id)
     db.set_session(user_id, S1, {})

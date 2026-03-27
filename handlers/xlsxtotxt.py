@@ -56,6 +56,7 @@ def _extract_numbers_sync(filepath: str, ext: str) -> list:
 
 async def cmd_xlsxtotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    db.increment_usage(user_id)
     clear_user_dir(user_id)
     
     user_dir = get_user_dir(user_id)

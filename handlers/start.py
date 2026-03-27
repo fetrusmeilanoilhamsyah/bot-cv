@@ -9,11 +9,6 @@ from config import ADMIN_CONTACT, TUTORIAL_LINK
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
-    # Cancel semua proses aktif user saat /start
-    cancel_all(user.id)
-    db.clear_session(user.id)
-    clear_user_dir(user.id)
-
     # Daftarkan user ke database
     db.upsert_user(user.id, user.username or "", user.full_name)
     db.increment_usage(user.id)
@@ -30,7 +25,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     first_name = user.first_name or user.full_name or "Kawan"
     bot_username = context.bot.username or "Bot"
-
+    
+    # 1. KIRIM REPLY SEGERA (INSTANT RESPONSE)
     msg = (
         f"Halo {first_name}!\n"
         f"Referral: `t.me/{bot_username}?start=ref_{user.id}` (+2 hari VIP)"
@@ -63,7 +59,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("Tutorial Penggunaan Bot", url=TUTORIAL_LINK)
     ]])
-
     admin_url = f"https://t.me/{ADMIN_CONTACT.lstrip('@')}"
 
     await update.message.reply_text(
@@ -76,3 +71,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard,
         disable_web_page_preview=True
     )
+
+    # 2. KERJAKAN CLEANUP DI BACKGROUND (TIDAK BLOKIR REPLY)
+    async def cleanup_bg():
+        cancel_all(user.id)
+        db.clear_session(user.id)
+        clear_user_dir(user.id)
+    
+    asyncio.create_task(cleanup_bg())

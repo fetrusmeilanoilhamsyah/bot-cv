@@ -13,6 +13,10 @@ from core.vcf_parser import parse_vcf_file
 from core.utils import sanitize_filename
 
 STATE        = "VCF2TXT_COLLECTING"
+STATE_NAMING = "VCF2TXT_NAMING"
+
+MAX_FILES   = 40096
+MAX_SIZE_MB = 500
 _user_status_msg: dict = {}
 _user_bg_tasks: dict = {}
 _user_last_edit: dict = {}

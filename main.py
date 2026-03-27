@@ -16,9 +16,11 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    CallbackQueryHandler,
     filters,
     ContextTypes,
 )
+from logging.handlers import RotatingFileHandler
 from config import BOT_TOKEN
 from database import db
 
@@ -112,7 +114,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
     handlers=[
-        logging.FileHandler("logs/bot.log", encoding="utf-8"),
+        RotatingFileHandler("logs/bot.log", maxBytes=10*1024*1024, backupCount=5, encoding="utf-8"),
         logging.StreamHandler(),
     ],
 )

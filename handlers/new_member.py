@@ -11,7 +11,7 @@ async def cmd_newmember(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE, {})
-    await update.message.reply_text("Telegram ID user yang akan diaktifkan:")
+    await update.message.reply_text("ID target:")
 
 
 async def handle_newmember_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -21,9 +21,9 @@ async def handle_newmember_id(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     text = update.message.text.strip()
     if not text.isdigit():
-        await update.message.reply_text("ID tidak valid. Masukkan angka Telegram ID, contoh: 123456789")
+        await update.message.reply_text("ID harus angka.")
         return
     target_id = int(text)
     db.set_member(target_id)
     db.clear_session(user_id)
-    await update.message.reply_text(f"User {target_id} diaktifkan sebagai member.")
+    await update.message.reply_text(f"User {target_id} aktif.")

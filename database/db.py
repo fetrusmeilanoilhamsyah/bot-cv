@@ -192,8 +192,14 @@ def set_member(user_id: int, full_name: str = ""):
 
 
 def set_member_vip(user_id: int, days: int, full_name: str = ""):
-    """Set user as VIP member with expiry date"""
+    """Set user as VIP member with expiry date. Admins are forced to NULL (permanent)."""
     from datetime import datetime, timedelta
+    from config import ADMIN_IDS
+    
+    if user_id in ADMIN_IDS:
+        set_member(user_id, full_name)
+        return None
+
     expired_at = (datetime.now() + timedelta(days=days)).isoformat()
     with get_connection() as conn:
         conn.execute("""
@@ -251,7 +257,7 @@ def get_all_users_detail():
     """Get all users with full details for /daftar command"""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, username, full_name, is_member, joined_at FROM users ORDER BY joined_at DESC"
+            "SELECT id, username, full_name, is_member, joined_at, expired_at FROM users ORDER BY joined_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 

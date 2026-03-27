@@ -11,6 +11,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import parse_vcf_file, contacts_to_vcf
+from core.utils import sanitize_filename
 
 STATE        = "MERGE_COLLECTING"
 STATE_NAMING = "MERGE_NAMING"
@@ -36,7 +37,7 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
             jumlah = sess["data"]["count"]
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done untuk selesai."
+                text=f"{jumlah} file diterima. /done jika selesai."
             )
 
 
@@ -69,8 +70,7 @@ async def cmd_merge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _clear_buffers(user_id)
     db.set_session(user_id, STATE, {"count": 0, "total_size": 0})
     await update.message.reply_text(
-        "Kirim file VCF yang ingin digabung. Boleh sekaligus banyak.\n"
-        "/done setelah semua terkirim."
+        "Kirim file VCF.\nKetik /done jika selesai."
     )
 
 
@@ -130,7 +130,7 @@ async def handle_merge_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     db.set_session(user_id, STATE_NAMING, data)
     await update.message.reply_text(
-        f"{data['count']} file diterima. Nama file output:"
+        f"{data['count']} file diterima. Nama file:"
     )
 
 
@@ -146,12 +146,12 @@ async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE
     data["is_processing"] = True
     db.set_session(user_id, STATE_NAMING, data)
 
-    file_name  = update.message.text.strip()
+    file_name  = sanitize_filename(update.message.text.strip())
     total_files = data["count"]
 
     # Kirim progress awal
     progress_msg = await update.message.reply_text(
-        f"⚙️ Memproses {total_files} file... 0%"
+        f"Memproses {total_files} file... 0%"
     )
 
     user_dir  = get_user_dir(user_id)
@@ -206,7 +206,7 @@ async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Edit progress tiap ~25% kalau file banyak
     async def update_progress(pct: int):
         try:
-            await progress_msg.edit_text(f"⚙️ Memproses {total_files} file... {pct}%")
+            await progress_msg.edit_text(f"Memproses {total_files} file... {pct}%")
         except Exception:
             pass
 
@@ -219,9 +219,9 @@ async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if not all_contacts:
         try:
-            await progress_msg.edit_text("❌ Gagal. Tidak ada kontak valid ditemukan.")
+            await progress_msg.edit_text("Gagal. Kontak tidak ditemukan.")
         except Exception:
-            await update.message.reply_text("❌ Gagal. Tidak ada kontak valid ditemukan.")
+            await update.message.reply_text("Gagal. Kontak tidak ditemukan.")
         _clear_buffers(user_id)
         db.clear_session(user_id)
         return
@@ -235,7 +235,7 @@ async def handle_merge_naming(update: Update, context: ContextTypes.DEFAULT_TYPE
         db.clear_session(user_id)
 
         await progress_msg.edit_text(
-            f"✅ Selesai! {len(all_contacts)} kontak dari {total_files} file — data tersusun berurutan."
+            f"Selesai. {len(all_contacts)} kontak dari {total_files} file."
         )
         with open(out_path, "rb") as f:
             await update.message.reply_document(document=f, filename=f"{file_name}.vcf")

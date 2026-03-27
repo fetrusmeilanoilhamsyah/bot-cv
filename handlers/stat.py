@@ -17,8 +17,8 @@ def _uptime_str() -> str:
     h, rem = divmod(secs, 3600)
     m, s   = divmod(rem, 60)
     if h:
-        return f"{h}j {m}m {s}d"
-    return f"{m}m {s}d"
+        return f"{h}j {m}m {s}s"
+    return f"{m}m {s}s"
 
 
 async def cmd_stat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,16 +48,10 @@ async def cmd_stat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tmp_size_mb = tmp_size / (1024 * 1024)
 
     await update.message.reply_text(
-        f"<b>STATISTIK BOT</b>\n"
-        f"{'─'*28}\n"
-        f"Uptime      : {_uptime_str()}\n"
-        f"{'─'*28}\n"
-        f"Total user  : {total}\n"
-        f"Member aktif: {members}\n"
-        f"  - VIP timed : {vip_timed}\n"
-        f"  - Permanen  : {members - vip_timed}\n"
-        f"Non-member  : {non_mem}\n"
-        f"{'─'*28}\n"
-        f"Tmp files   : {tmp_count} file ({tmp_size_mb:.2f} MB)",
-        parse_mode="HTML"
+        f"STATISTIK\n"
+        f"Uptime: {_uptime_str()}\n"
+        f"Total user: {total}\n"
+        f"Member: {members} (P:{members-vip_timed}, V:{vip_timed})\n"
+        f"Non-member: {non_mem}\n"
+        f"Tmp: {tmp_count} file ({tmp_size_mb:.2f} MB)"
     )

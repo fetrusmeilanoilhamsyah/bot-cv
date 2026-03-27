@@ -17,7 +17,7 @@ async def cmd_daftar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = db.get_all_users_detail()
 
     if not users:
-        await update.message.reply_text("Belum ada pengguna yang terdaftar.")
+        await update.message.reply_text("Belum ada pengguna.")
         return
 
     total       = len(users)
@@ -25,9 +25,8 @@ async def cmd_daftar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_non   = total - total_member
 
     header = (
-        f"📋 <b>DAFTAR PENGGUNA BOT</b>\n"
-        f"Total: {total} user  |  Member: {total_member}  |  Non-member: {total_non}\n"
-        f"{'─' * 30}\n"
+        f"<b>DAFTAR PENGGUNA</b>\n"
+        f"Total: {total} | Member: {total_member} | Non: {total_non}\n\n"
     )
 
     # Kirim dalam chunks agar tidak melebihi batas 4096 karakter Telegram
@@ -35,11 +34,11 @@ async def cmd_daftar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chunk = users[i:i + CHUNK]
         lines = []
         for u in chunk:
-            icon     = "⭐" if u["is_member"] else "👤"
-            username = f"@{u['username']}" if u["username"] else "—"
-            name     = u["full_name"] or "—"
+            icon     = "*" if u["is_member"] else "-"
+            username = f"@{u['username']}" if u["username"] else "-"
+            name     = u["full_name"] or "-"
             uid      = u["id"]
-            lines.append(f"{icon} <b>{name}</b> ({username})\n    ID: <code>{uid}</code>")
+            lines.append(f"{icon} <b>{name}</b> ({username})\nID: <code>{uid}</code>")
 
         msg = (header if i == 0 else "") + "\n\n".join(lines)
         await update.message.reply_text(msg, parse_mode="HTML")

@@ -10,6 +10,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import parse_vcf_file
+from core.utils import sanitize_filename
 
 STATE        = "VCF2TXT_COLLECTING"
 STATE_NAMING = "VCF2TXT_NAMING"
@@ -35,7 +36,7 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
             jumlah = sess["data"]["count"]
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done untuk selesai."
+                text=f"{jumlah} file diterima. /done jika selesai."
             )
 
 
@@ -68,8 +69,7 @@ async def cmd_vcftotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _clear_buffers(user_id)
     db.set_session(user_id, STATE, {"count": 0, "total_size": 0})
     await update.message.reply_text(
-        "Kirim file VCF yang ingin dikonversi ke TXT. Boleh sekaligus banyak.\n"
-        "/done setelah semua terkirim."
+        "Kirim file VCF.\nKetik /done jika selesai."
     )
 
 
@@ -128,7 +128,7 @@ async def handle_vcftotxt_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
     db.set_session(user_id, STATE_NAMING, sess["data"])
     await update.message.reply_text(
-        f"{sess['data']['count']} file diterima. Nama file output:"
+        f"{sess['data']['count']} file diterima. Nama file:"
     )
 
 
@@ -143,11 +143,11 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
     data["is_processing"] = True
     db.set_session(user_id, STATE_NAMING, data)
 
-    file_name   = update.message.text.strip()
+    file_name   = sanitize_filename(update.message.text.strip())
     total_files = data["count"]
 
     progress_msg = await update.message.reply_text(
-        f"⚙️ Memproses {total_files} file... 0%"
+        f"Memproses {total_files} file... 0%"
     )
 
     user_dir = get_user_dir(user_id)
@@ -200,7 +200,7 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
 
     async def update_progress(pct: int):
         try:
-            await progress_msg.edit_text(f"⚙️ Memproses {total_files} file... {pct}%")
+            await progress_msg.edit_text(f"Memproses {total_files} file... {pct}%")
         except Exception:
             pass
 
@@ -213,7 +213,7 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         if not numbers:
-            await progress_msg.edit_text("❌ Gagal. Tidak ada nomor yang ditemukan.")
+            await progress_msg.edit_text("Gagal. Nomor tidak ditemukan.")
             _clear_buffers(user_id)
             try:
                 if os.path.exists(out_txt):
@@ -223,7 +223,7 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
             return
 
         await progress_msg.edit_text(
-            f"✅ {len(numbers)} nomor diekstrak dari {total_files} file — urutan terjamin."
+            f"Selesai. {len(numbers)} nomor dari {total_files} file."
         )
         with open(out_txt, "rb") as f:
             await update.message.reply_document(document=f, filename=f"{file_name}.txt")

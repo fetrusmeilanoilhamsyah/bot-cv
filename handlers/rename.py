@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
+from core.utils import sanitize_filename
 
 STATE_NAME = "RENAME_WAIT_NAME"
 STATE_FILE = "RENAME_WAIT_FILE"
@@ -18,7 +19,7 @@ async def cmd_rename(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE_NAME, {})
-    await update.message.reply_text("Nama file yang diinginkan:")
+    await update.message.reply_text("Nama file:")
 
 
 async def handle_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,9 +27,9 @@ async def handle_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE)
     sess = db.get_session(user_id)
     if sess["state"] != STATE_NAME:
         return
-    file_name = update.message.text.strip()
+    file_name = sanitize_filename(update.message.text.strip())
     db.set_session(user_id, STATE_FILE, {"file_name": file_name})
-    await update.message.reply_text("Kirim file VCF yang ingin diganti namanya.")
+    await update.message.reply_text("Kirim file VCF.")
 
 
 async def handle_rename_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -48,7 +49,7 @@ async def handle_rename_file(update: Update, context: ContextTypes.DEFAULT_TYPE)
     db.clear_session(user_id)
 
     if os.path.exists(out_path) and os.path.getsize(out_path) == 0:
-        await update.message.reply_text("File yang dikirim kosong (0 bytes).")
+        await update.message.reply_text("File kosong.")
         try:
             os.remove(out_path)
         except Exception:

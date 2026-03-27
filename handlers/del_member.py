@@ -10,7 +10,7 @@ async def cmd_delmember(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE, {})
-    await update.message.reply_text("Telegram ID user yang akan dicopot:")
+    await update.message.reply_text("ID target:")
 
 async def handle_delmember_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -20,9 +20,7 @@ async def handle_delmember_id(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     text = update.message.text.strip()
     if not text.isdigit():
-        await update.message.reply_text(
-            "ID tidak valid. Masukkan angka Telegram ID, contoh: 123456789"
-        )
+        await update.message.reply_text("ID harus angka.")
         return
         
     target_id = int(text)
@@ -37,5 +35,5 @@ async def handle_delmember_id(update: Update, context: ContextTypes.DEFAULT_TYPE
     db.remove_member(target_id)
     db.clear_session(user_id)
     await update.message.reply_text(
-        f"Akses member user {target_id} ({user['full_name']}) dicabut."
+        f"Akses {target_id} dicabut."
     )

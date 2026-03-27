@@ -17,8 +17,7 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clear_user_dir(user_id)
 
     await update.message.reply_text(
-        "✅ Sesi dan data sementara Anda berhasil dibersihkan.\n"
-        "Gunakan /reset setiap selesai konversi agar RAM tetap bersih."
+        "Sesi dibersihkan."
     )
 
     # Menu Tambahan buat Admin
@@ -29,10 +28,9 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
-            "🛠 **ADMIN MENU**\n"
-            "Anda dapat melakukan reset total database dan semua sesi user.",
-            reply_markup=reply_markup,
-            parse_mode="Markdown"
+            "ADMIN MENU\n"
+            "Reset total database.",
+            reply_markup=reply_markup
         )
 
 
@@ -58,11 +56,9 @@ async def handle_reset_callback(update: Update, context: ContextTypes.DEFAULT_TY
             ]
         ]
         await query.edit_message_text(
-            "❓ **KONFIRMASI AKHIR**\n"
-            "Semua data user, member, dan log broadcast akan DIHAPUS PERMANEN.\n"
-            "Tindakan ini tidak bisa dibatalkan!",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+            "KONFIRMASI\n"
+            "Hapus semua data permanent?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
     elif data == "admin_db_reset_final":
@@ -70,9 +66,8 @@ async def handle_reset_callback(update: Update, context: ContextTypes.DEFAULT_TY
         db.clear_all_db()
         clear_all_sessions()
         await query.edit_message_text(
-            "🚀 **DATABASE RESET BERHASIL!**\nSistem kembali ke kondisi awal.",
-            parse_mode="Markdown"
+            "Database berhasil direset."
         )
 
     elif data == "admin_db_reset_cancel":
-        await query.edit_message_text("❌ Reset dibatalkan.")
+        await query.edit_message_text("Reset dibatalkan.")

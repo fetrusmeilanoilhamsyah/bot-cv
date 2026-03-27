@@ -8,6 +8,7 @@ from telegram import Update, Document
 from telegram.ext import ContextTypes
 from database import db
 from middleware.session import get_user_dir, clear_user_dir
+from core.utils import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +65,7 @@ async def cmd_xlsxtotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.set_session(user_id, STATE, {"total_kontak": 0, "total_file": 0})
     await update.message.reply_text(
         "Kirim file Excel (.xlsx) atau CSV (.csv).\n"
-        "Bot akan scan semua kolom dan ekstrak nomor HP otomatis.\n\n"
-        "Bisa kirim lebih dari satu file.\n"
-        "Selesai? Ketik /done"
+        "Klik /done jika selesai."
     )
 
 async def handle_xlsxtotxt_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -77,12 +76,12 @@ async def handle_xlsxtotxt_file(update: Update, context: ContextTypes.DEFAULT_TY
         
     doc = update.message.document
     if not doc or not doc.file_name:
-        await update.message.reply_text("Kirim file dokumen (.xlsx atau .csv).")
+        await update.message.reply_text("Kirim file .xlsx atau .csv.")
         return
         
     ext = os.path.splitext(doc.file_name)[1].lower()
     if ext not in [".xlsx", ".xls", ".csv"]:
-        await update.message.reply_text("Format tidak didukung. Hanya .xlsx dan .csv.")
+        await update.message.reply_text("Format tidak didukung.")
         return
         
     user_dir = get_user_dir(user_id)
@@ -132,9 +131,8 @@ async def handle_xlsxtotxt_file(update: Update, context: ContextTypes.DEFAULT_TY
     db.set_session(user_id, STATE, data)
     
     await update.message.reply_text(
-        f"Ditemukan {len(found_numbers)} kontak unik di {doc.file_name}.\n"
-        f"Total: {new_total} kontak dari {data['total_file']} file.\n\n"
-        "Kirim file lain atau ketik /done."
+        f"{len(found_numbers)} kontak unik di {doc.file_name}.\n"
+        f"Total: {new_total} ({data['total_file']} file)."
     )
 
 async def handle_xlsxtotxt_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -147,7 +145,7 @@ async def handle_xlsxtotxt_done(update: Update, context: ContextTypes.DEFAULT_TY
     total = data.get("total_kontak", 0)
     
     if total == 0:
-        await update.message.reply_text("Tidak ditemukan nomor HP valid. Sesi dibatalkan.")
+        await update.message.reply_text("Nomor tidak ditemukan.")
         db.clear_session(user_id)
         clear_user_dir(user_id)
         return
@@ -162,8 +160,7 @@ async def handle_xlsxtotxt_done(update: Update, context: ContextTypes.DEFAULT_TY
             
         await update.message.reply_document(
             document=buffer,
-            caption=f"Selesai. {total} kontak unik diekstrak tanpa duplikat.\n"
-                    f"Sesi ditutup."
+            caption=f"Selesai. {total} kontak unik."
         )
     except Exception as e:
         logger.error("Error kirim hasil xlsx: %s", e)

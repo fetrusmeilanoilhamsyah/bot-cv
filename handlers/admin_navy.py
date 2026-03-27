@@ -7,6 +7,7 @@ from telegram.ext import ContextTypes
 from database import db
 from middleware.auth import require_member
 from core.vcf_parser import add_plus, contacts_to_vcf
+from core.utils import sanitize_filename
 
 STATES = {
     "WAIT_ADMIN_NUMBERS": "AN_STEP1",
@@ -23,9 +24,7 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     db.set_session(user_id, STATES["WAIT_ADMIN_NUMBERS"], {})
     await update.message.reply_text(
-        "Nomor ADMIN (satu per baris):\n"
-        "628123456789\n"
-        "628987654321"
+        "Nomor ADMIN (satu per baris):"
     )
 
 
@@ -46,20 +45,20 @@ async def handle_admin_navy(update: Update, context: ContextTypes.DEFAULT_TYPE):
         numbers = [n.strip() for n in text.splitlines() if n.strip()]
         data["navy_numbers"] = numbers
         db.set_session(user_id, STATES["WAIT_ADMIN_NAME"], data)
-        await update.message.reply_text("Nama label ADMIN:")
+        await update.message.reply_text("Label ADMIN:")
 
     elif state == STATES["WAIT_ADMIN_NAME"]:
         data["admin_name"] = text
         db.set_session(user_id, STATES["WAIT_NAVY_NAME"], data)
-        await update.message.reply_text("Nama label NAVY:")
+        await update.message.reply_text("Label NAVY:")
 
     elif state == STATES["WAIT_NAVY_NAME"]:
         data["navy_name"] = text
         db.set_session(user_id, STATES["WAIT_FILE_NAME"], data)
-        await update.message.reply_text("Nama file output:")
+        await update.message.reply_text("Nama file:")
 
     elif state == STATES["WAIT_FILE_NAME"]:
-        data["file_name"] = text
+        data["file_name"] = sanitize_filename(text)
 
         # Build VCF di RAM langsung, tidak perlu disk sama sekali
         contacts = []

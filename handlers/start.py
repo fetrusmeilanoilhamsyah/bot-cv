@@ -50,10 +50,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_url = f"https://t.me/{ADMIN_CONTACT.lstrip('@')}"
 
     await update.message.reply_text(
-        f"Hallo <b>{first_name}</b>, selamat datang di bot\n"
-        f"Fitur bot:\n"
+        f"<b>{first_name}</b>\n\n"
+        f"Fitur:\n"
         f"<pre>{fitur}</pre>\n"
-        f"Bot milik <a href='{admin_url}'>{ADMIN_CONTACT}</a>",
+        f"Owner: <a href='{admin_url}'>{ADMIN_CONTACT}</a>",
         parse_mode="HTML",
         reply_markup=keyboard,
         disable_web_page_preview=True

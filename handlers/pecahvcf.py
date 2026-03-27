@@ -11,6 +11,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import parse_vcf_file, contacts_to_vcf
+from core.utils import sanitize_filename
 
 STATE_PER_FILE = "PECAH_PER_FILE"
 STATE_WAIT_VCF = "PECAH_WAIT_VCF"
@@ -21,7 +22,7 @@ async def cmd_pecahvcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE_PER_FILE, {})
-    await update.message.reply_text("Kontak per file: (contoh: 50)")
+    await update.message.reply_text("Kontak per file: (misal: 50)")
 
 
 async def handle_pecah_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,10 +32,10 @@ async def handle_pecah_per_file(update: Update, context: ContextTypes.DEFAULT_TY
         return
     text = update.message.text.strip()
     if not text.isdigit() or int(text) < 1:
-        await update.message.reply_text("Masukkan angka yang valid, contoh: 50")
+        await update.message.reply_text("Input angka valid.")
         return
     db.set_session(user_id, STATE_WAIT_VCF, {"per_file": int(text)})
-    await update.message.reply_text("Kirim file VCF yang ingin dipecah.")
+    await update.message.reply_text("Kirim file VCF.")
 
 
 async def handle_pecah_vcf_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -45,7 +46,7 @@ async def handle_pecah_vcf_file(update: Update, context: ContextTypes.DEFAULT_TY
     data = sess["data"]
     per_file = data["per_file"]
 
-    await update.message.reply_text("Memproses, harap tunggu...")
+    await update.message.reply_text("Memproses...")
 
     doc = update.message.document
     file_obj = await context.bot.get_file(doc.file_id)

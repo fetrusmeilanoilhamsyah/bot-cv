@@ -10,6 +10,7 @@ from database import db
 from middleware.auth import require_member
 from middleware.session import get_user_dir
 from core.vcf_parser import add_plus, contacts_to_vcf
+from core.utils import sanitize_filename
 
 S1 = "TTV_CONTACT_NAME"
 S2 = "TTV_PER_FILE"
@@ -38,7 +39,7 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
             jumlah = sess["data"]["count"]
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done untuk selesai."
+                text=f"{jumlah} file diterima. /done jika selesai."
             )
 
 
@@ -70,7 +71,7 @@ async def cmd_txttovcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _cancel_timer(user_id)
     _clear_buffers(user_id)
     db.set_session(user_id, S1, {})
-    await update.message.reply_text("Nama kontak: (contoh: FEE)")
+    await update.message.reply_text("Nama kontak: (misal: FEE)")
 
 
 async def handle_ttv_contact_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,7 +82,7 @@ async def handle_ttv_contact_name(update: Update, context: ContextTypes.DEFAULT_
     data = sess["data"]
     data["contact_name"] = update.message.text.strip()
     db.set_session(user_id, S2, data)
-    await update.message.reply_text("Kontak per file: (contoh: 50)")
+    await update.message.reply_text("Kontak per file: (misal: 50)")
 
 
 async def handle_ttv_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -91,12 +92,12 @@ async def handle_ttv_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     text = update.message.text.strip()
     if not text.isdigit() or int(text) < 1:
-        await update.message.reply_text("Masukkan angka yang valid, contoh: 50")
+        await update.message.reply_text("Input angka valid.")
         return
     data = sess["data"]
     data["per_file"] = int(text)
     db.set_session(user_id, S3, data)
-    await update.message.reply_text("Nama file output: (contoh: AYAM GORENG)")
+    await update.message.reply_text("Nama file: (misal: KONTAK)")
 
 
 async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,9 +106,9 @@ async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYP
     if sess["state"] != S3:
         return
     data = sess["data"]
-    data["file_name"] = update.message.text.strip()
+    data["file_name"] = sanitize_filename(update.message.text.strip())
     db.set_session(user_id, S4, data)
-    await update.message.reply_text("Urutan file mulai dari angka: (contoh: 1)")
+    await update.message.reply_text("Index mulai: (misal: 1)")
 
 
 async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,7 +118,7 @@ async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = update.message.text.strip()
     if not text.isdigit() or int(text) < 1:
-        await update.message.reply_text("Masukkan angka yang valid, contoh: 1")
+        await update.message.reply_text("Input angka valid.")
         return
     data = sess["data"]
     data["awalan"] = int(text)
@@ -126,8 +127,8 @@ async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _clear_buffers(user_id)
     db.set_session(user_id, S5, data)
     await update.message.reply_text(
-        "Kirim file TXT. Boleh sekaligus banyak.\n"
-        "/done setelah semua terkirim."
+        "Kirim file TXT.\n"
+        "Ketik /done jika selesai."
     )
 
 
@@ -189,7 +190,7 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data["is_processing"] = True
     db.set_session(user_id, S5, data)
-    await update.message.reply_text("Menyusun, harap tunggu...")
+    await update.message.reply_text("Memproses...")
 
     user_dir = get_user_dir(user_id)
     ttv_dir = os.path.join(user_dir, "txttovcf")
@@ -249,13 +250,13 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if not results:
-            await update.message.reply_text("❌ Tidak ada data yang bisa diproses.")
+            await update.message.reply_text("Gagal. Data tidak ditemukan.")
             return
 
         total_files = len(results)
 
         # ── Tampilkan ringkasan nama file dulu ───────────────────────────────
-        header = f"✅ {len(all_numbers)} kontak → {total_files} file\n\n"
+        header = f"{len(all_numbers)} kontak -> {total_files} file\n"
         lines  = [f"{file_name} {awalan + i}.vcf" for i in range(total_files)]
 
         CHUNK = 50
@@ -263,9 +264,8 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = (header if i == 0 else "") + "\n".join(lines[i:i + CHUNK])
             await update.message.reply_text(msg)
 
-        # ── STEP 1: Baca SEMUA file ke memori secara paralel (disk IO nol saat kirim) ──
         send_status = await update.message.reply_text(
-            f"📤 Menyiapkan {total_files} file..."
+            f"Menyiapkan {total_files} file..."
         )
 
         def read_bytes(path: str) -> bytes:
@@ -290,13 +290,13 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if idx % 5 == 0 or idx == total_files:
                 try:
                     await send_status.edit_text(
-                        f"📤 Mengirim {total_files} file... {idx}/{total_files}"
+                        f"Mengirim {total_files} file... {idx}/{total_files}"
                     )
                 except Exception:
                     pass
 
         try:
-            await send_status.edit_text(f"✅ Semua {total_files} file terkirim! (urutan terjamin)")
+            await send_status.edit_text(f"Selesai. {total_files} file terkirim.")
         except Exception:
             pass
 

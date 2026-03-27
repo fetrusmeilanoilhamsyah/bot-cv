@@ -11,7 +11,7 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.effective_user.id
     db.set_session(user_id, STATE, {})
-    await update.message.reply_text("Tulis pesan broadcast:")
+    await update.message.reply_text("Tulis pesan:")
 
 
 async def handle_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,7 +32,7 @@ async def handle_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYP
     success = 0
     fail = 0
 
-    await update.message.reply_text(f"Mengirim broadcast ke {len(all_ids)} user...")
+    await update.message.reply_text(f"Mengirim ke {len(all_ids)} user...")
 
     for uid in all_ids:
         try:
@@ -45,5 +45,5 @@ async def handle_broadcast_msg(update: Update, context: ContextTypes.DEFAULT_TYP
     db.clear_session(user_id)
 
     await update.message.reply_text(
-        f"Broadcast selesai.\nBerhasil: {success}\nGagal: {fail}"
+        f"Selesai.\nBerhasil: {success}\nGagal: {fail}"
     )

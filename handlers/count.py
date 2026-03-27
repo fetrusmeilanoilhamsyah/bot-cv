@@ -39,9 +39,8 @@ async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.set_session(user_id, STATE, {"total_kontak": 0, "total_file": 0})
     
     await update.message.reply_text(
-        "Kirim file TXT atau VCF yang ingin dihitung kontaknya.\n"
-        "Bisa kirim banyak file sekaligus.\n\n"
-        "Jika sudah selesai mengirim file, klik /done atau ketik Selesai."
+        "Kirim file TXT atau VCF.\n"
+        "Klik /done jika selesai."
     )
 
 async def handle_count_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,7 +57,7 @@ async def handle_count_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     ext = os.path.splitext(doc.file_name)[1].lower()
     if ext not in [".txt", ".vcf"]:
-        await update.message.reply_text("Hanya menerima file berformat TXT atau VCF.")
+        await update.message.reply_text("Hanya file TXT/VCF.")
         return
         
     file_id = doc.file_id
@@ -91,9 +90,8 @@ async def handle_count_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.set_session(user_id, STATE, data)
     
     await update.message.reply_text(
-        f"File {doc.file_name} berisi {count} kontak.\n\n"
-        f"Total sementara: {data['total_kontak']} kontak dari {data['total_file']} file.\n"
-        "Kirim file lagi atau klik /done jika selesai."
+        f"{doc.file_name}: {count} kontak.\n"
+        f"Total: {data['total_kontak']} ({data['total_file']} file)."
     )
 
 async def handle_count_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -108,10 +106,9 @@ async def handle_count_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_file = data.get("total_file", 0)
     
     await update.message.reply_text(
-        "Kalkulasi Selesai\n\n"
-        f"Jumlah File: {total_file}\n"
-        f"Total Kontak: {total_kontak}\n\n"
-        "Sesi perhitungan ditutup."
+        f"Selesai.\n"
+        f"File: {total_file}\n"
+        f"Kontak: {total_kontak}"
     )
     
     db.clear_session(user_id)

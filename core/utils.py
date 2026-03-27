@@ -1,7 +1,7 @@
 import re
 
 def sanitize_filename(filename: str) -> str:
-    """
+    r"""
     Menghapus karakter yang tidak diperbolehkan dalam nama file:
     \ / : * ? " < > |
     Serta membatasi panjang nama file.

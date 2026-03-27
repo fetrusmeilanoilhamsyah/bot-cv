@@ -32,7 +32,7 @@ def get_user_lock(user_id: int) -> asyncio.Lock:
 
 
 async def _debounce_notify(user_id: int, context, chat_id: int):
-    await asyncio.sleep(3)
+    await asyncio.sleep(1)
     if _user_timers.get(user_id) is asyncio.current_task():
         sess = db.get_session(user_id)
         if sess and sess.get("state") == S5:

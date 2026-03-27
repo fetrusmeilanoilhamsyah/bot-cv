@@ -17,7 +17,6 @@ _user_status_msg: dict = {}
 _user_bg_tasks: dict = {}
 _user_last_edit: dict = {}
 _user_locks: dict = {}
-_user_locks: dict = {}
 
 def get_user_lock(user_id: int) -> asyncio.Lock:
     if user_id not in _user_locks:
@@ -36,31 +35,10 @@ async def _bg_download(context, file_id: str, out_path: str, user_id: int):
             _user_bg_tasks[user_id].discard(asyncio.current_task())
 
 
-async def _debounce_notify(user_id: int, context, chat_id: int):
-    await asyncio.sleep(3)
-    if _user_timers.get(user_id) is asyncio.current_task():
-        sess = db.get_session(user_id)
-        if sess and sess.get("state") == STATE:
-            jumlah = sess["data"]["count"]
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done jika selesai."
-            )
-
-
-def _reset_timer(user_id, context, chat_id):
-    old = _user_timers.get(user_id)
-    if old:
-        old.cancel()
-    _user_timers[user_id] = asyncio.ensure_future(
-        _debounce_notify(user_id, context, chat_id)
-    )
-
-
-def _cancel_timer(user_id):
-    old = _user_timers.pop(user_id, None)
-    if old:
-        old.cancel()
+def _clear_buffers(user_id: int):
+    user_dir = get_user_dir(user_id)
+    v2t_dir = os.path.join(user_dir, "vcftotxt")
+    shutil.rmtree(v2t_dir, ignore_errors=True)
 
 
 def _clear_buffers(user_id: int):

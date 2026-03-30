@@ -237,6 +237,8 @@ async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_count_file(update, context)
     elif state == XLSX2TXT_STATE:
         await handle_xlsxtotxt_file(update, context)
+    elif state == MEDIA_BROADCAST_STATE:
+        await handle_broadcast_media(update, context)
 
 # The done_router function is now integrated into text_router for "selesai", "/done", "done" messages.
 # However, the CommandHandler("done", ...) still needs a function.
@@ -317,7 +319,7 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_reset_callback, pattern="^admin_db_reset"))
 
     # Message handlers (wrapped with rate limiter)
-    app.add_handler(MessageHandler(filters.Document.ALL, rate_limiter(file_router)))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO | filters.ANIMATION, rate_limiter(file_router)))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rate_limiter(text_router)))
 
     # Error handler

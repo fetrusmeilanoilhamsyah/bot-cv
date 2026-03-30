@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 from database import db
 from middleware.auth import require_admin
 from config import ADMIN_IDS
+import asyncio
 
 STATE = "WAIT_BROADCAST_MEDIA"
 
@@ -31,8 +32,11 @@ async def handle_broadcast_media(update: Update, context: ContextTypes.DEFAULT_T
     elif update.message.video:
         media = update.message.video.file_id
         media_type = "video"
+    elif update.message.animation:
+        media = update.message.animation.file_id
+        media_type = "animation"
     else:
-        await update.message.reply_text("Gagal. Kirim foto atau video.")
+        await update.message.reply_text("Gagal. Kirim foto, video, atau GIF.")
         return
 
     caption = update.message.caption or ""
@@ -49,9 +53,12 @@ async def handle_broadcast_media(update: Update, context: ContextTypes.DEFAULT_T
         try:
             if media_type == "photo":
                 await context.bot.send_photo(chat_id=uid, photo=media, caption=caption)
-            else:
+            elif media_type == "video":
                 await context.bot.send_video(chat_id=uid, video=media, caption=caption)
+            elif media_type == "animation":
+                await context.bot.send_animation(chat_id=uid, animation=media, caption=caption)
             success += 1
+            await asyncio.sleep(0.05)  # Anti rate-limit
         except Exception:
             fail += 1
             

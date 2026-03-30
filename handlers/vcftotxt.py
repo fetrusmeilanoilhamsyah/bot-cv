@@ -33,10 +33,11 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
     if _user_timers.get(user_id) is asyncio.current_task():
         sess = db.get_session(user_id)
         if sess and sess.get("state") == STATE:
-            jumlah = sess["data"]["count"]
+            jumlah_file = sess["data"]["count"]
+            jumlah_kontak = sess["data"].get("total_contacts", 0)
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done jika selesai."
+                text=f"{jumlah_file} file diterima ({jumlah_kontak} kontak). /done jika selesai."
             )
 
 
@@ -68,7 +69,7 @@ async def cmd_vcftotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.increment_usage(user_id)
     _cancel_timer(user_id)
     _clear_buffers(user_id)
-    db.set_session(user_id, STATE, {"count": 0, "total_size": 0})
+    db.set_session(user_id, STATE, {"count": 0, "total_size": 0, "total_contacts": 0})
     await update.message.reply_text(
         "Kirim file VCF.\nKetik /done jika selesai."
     )
@@ -111,6 +112,18 @@ async def handle_vcftotxt_file(update: Update, context: ContextTypes.DEFAULT_TYP
 
         data["count"] += 1
         data["total_size"] = data.get("total_size", 0) + doc.file_size
+        
+        # Hitung jumlah kontak (BEGIN:VCARD)
+        try:
+            with open(out_path, "r", encoding="utf-8", errors="ignore") as f:
+                c = 0
+                for line in f:
+                    if "BEGIN:VCARD" in line.upper():
+                        c += 1
+                data["total_contacts"] = data.get("total_contacts", 0) + c
+        except Exception:
+            pass
+
         db.set_session(user_id, STATE, data)
 
     _reset_timer(user_id, context, chat_id)
@@ -129,7 +142,7 @@ async def handle_vcftotxt_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
     db.set_session(user_id, STATE_NAMING, sess["data"])
     await update.message.reply_text(
-        f"{sess['data']['count']} file diterima. Nama file:"
+        f"{sess['data']['count']} file diterima ({sess['data'].get('total_contacts', 0)} kontak). Nama file:"
     )
 
 

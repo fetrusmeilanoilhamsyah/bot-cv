@@ -10,17 +10,45 @@ from config import ADMIN_CONTACT, TUTORIAL_LINK
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
+    # Cek apakah user baru (untuk referral)
+    is_new_user = db.get_user(user.id) is None
+
     # Daftarkan user ke database
     db.upsert_user(user.id, user.username or "", user.full_name)
     db.increment_usage(user.id)
 
     # Cek referral: /start ref_ID
-    if context.args and len(context.args) > 0:
+    if is_new_user and context.args and len(context.args) > 0:
         arg = context.args[0]
         if arg.startswith("ref_"):
             try:
                 referrer_id = int(arg.replace("ref_", ""))
-                db.set_referrer(user.id, referrer_id)
+                if referrer_id != user.id:
+                    db.set_referrer(user.id, referrer_id)
+                    count = db.get_referral_count(referrer_id)
+                    
+                    # Notifikasi ke pengundang
+                    try:
+                        bonus_target = 5
+                        remains = bonus_target - (count % bonus_target)
+                        if remains == 0: remains = bonus_target # Jika pas kelipatan 5
+                        
+                        # Jika pas kelipatan 5, beri hadiah
+                        if count > 0 and count % bonus_target == 0:
+                            db.set_member_vip(referrer_id, 7, "Referral Bonus")
+                            await context.bot.send_message(
+                                chat_id=referrer_id,
+                                text=f"🎁 <b>BONUS REFERRAL!</b>\n\nTeman ke-{count} baru saja bergabung. Kamu mendapatkan <b>7 HARI VIP GRATIS!</b>",
+                                parse_mode="HTML"
+                            )
+                        else:
+                            await context.bot.send_message(
+                                chat_id=referrer_id,
+                                text=f"👤 <b>Teman baru bergabung!</b>\n\nSatu orang lagi menggunakan link kamu. (Total: {count} orang)\nUndang {count + remains - count} orang lagi untuk dapat 7 hari VIP GRATIS!",
+                                parse_mode="HTML"
+                            )
+                    except Exception:
+                        pass
             except ValueError:
                 pass
 
@@ -28,10 +56,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username or "Bot"
     
     # 1. KIRIM REPLY SEGERA (INSTANT RESPONSE)
-    msg = (
-        f"Halo {first_name}!\n"
-        f"Referral: `t.me/{bot_username}?start=ref_{user.id}` (+2 hari VIP)"
-    )
+    greeting = f"Halo {first_name}!"
     fitur = (
         "/txttovcf    - konversi file TXT ke VCF\n"
         "/vcftotxt    - konversi file VCF ke TXT\n"
@@ -42,6 +67,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/rename      - ganti nama file VCF\n"
         "/count       - hitung jumlah kontak\n"
         "/vip         - lihat & daftar paket VIP\n"
+        "/referal     - undang teman (Dapatkan VIP Gratis)\n"
         "/reset       - bersihkan sesi aktif\n"
         "/done        - selesaikan proses file\n"
         "─────────────────\n"
@@ -64,7 +90,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"<b>{first_name}</b>\n\n"
-        f"{msg}\n\n"
+        f"{greeting}\n\n"
         f"Fitur:\n"
         f"<pre>{fitur}</pre>\n"
         f"Owner: <a href='{admin_url}'>{ADMIN_CONTACT}</a>",

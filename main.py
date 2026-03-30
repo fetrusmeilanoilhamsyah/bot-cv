@@ -98,6 +98,7 @@ from handlers.new_member import (
     handle_newmember_id,
     STATE as NEWMEMBER_STATE,
 )
+from handlers.referral import cmd_referral
 from handlers.del_member import (
     cmd_delmember,
     handle_delmember_id,
@@ -296,6 +297,7 @@ def main():
     app.add_handler(CommandHandler("mediabroadcast", rate_limiter(cmd_media_broadcast)))
     app.add_handler(CommandHandler("newmember", rate_limiter(cmd_newmember)))
     app.add_handler(CommandHandler(["delmember", "copotmember"], rate_limiter(cmd_delmember)))
+    app.add_handler(CommandHandler(["referal", "referral"], rate_limiter(cmd_referral)))
     app.add_handler(CommandHandler("daftar", rate_limiter(cmd_daftar)))
     app.add_handler(CommandHandler("vip", rate_limiter(cmd_vip)))
     app.add_handler(CommandHandler("addvip", rate_limiter(cmd_addvip)))

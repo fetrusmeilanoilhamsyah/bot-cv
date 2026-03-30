@@ -169,10 +169,19 @@ def increment_usage(user_id: int):
 
 def set_referrer(user_id: int, referrer_id: int):
     """Set who referred this user (only once)"""
-    if user_id == referrer_id: return
+    if user_id == referrer_id: return None
     with get_connection() as conn:
+        # Cek apakah user sudah ada sebelumnya untuk mencegah spam referral
+        # (Idealnya dicek di level handler, tapi ini pengaman database)
         conn.execute("UPDATE users SET referred_by = ? WHERE id = ? AND referred_by IS NULL", (referrer_id, user_id))
         conn.commit()
+    return referrer_id
+
+def get_referral_count(referrer_id: int) -> int:
+    """Count how many users were referred by this ID"""
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) as count FROM users WHERE referred_by = ?", (referrer_id,)).fetchone()
+        return row["count"] if row else 0
 
 def get_referrer(user_id: int):
     """Get the ID of the person who referred this user"""

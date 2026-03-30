@@ -81,7 +81,7 @@ from handlers.txttovcf import (
     handle_ttv_awalan,
     handle_ttv_file,
     handle_ttv_done,
-    S1, S2, S3, S4, S5,
+    S0, S1, S2, S3, S4, S5,
 )
 from handlers.broadcast import (
     cmd_broadcast,
@@ -231,7 +231,7 @@ async def file_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_pecah_vcf_file(update, context)
     elif state == RENAME_S2:
         await handle_rename_file(update, context)
-    elif state == S5:
+    elif state in [S0, S5]:
         await handle_ttv_file(update, context)
     elif state == COUNT_STATE:
         await handle_count_file(update, context)
@@ -253,7 +253,7 @@ async def done_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_merge_done(update, context)
     elif state == VCF2TXT_STATE:
         await handle_vcftotxt_done(update, context)
-    elif state == S5:
+    elif state in [S0, S5]:
         await handle_ttv_done(update, context)
     elif state == COUNT_STATE:
         await handle_count_done(update, context)

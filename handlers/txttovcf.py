@@ -12,11 +12,12 @@ from middleware.session import get_user_dir
 from core.vcf_parser import add_plus, contacts_to_vcf
 from core.utils import sanitize_filename
 
+S0 = "TTV_WAIT_FILE"
 S1 = "TTV_CONTACT_NAME"
 S2 = "TTV_PER_FILE"
 S3 = "TTV_FILE_NAME"
 S4 = "TTV_AWALAN"
-S5 = "TTV_COLLECTING"
+S5 = "TTV_COLLECTING"  # Will still keep this for backward compatibility if needed, but primary flow uses S0
 
 MAX_FILES   = 40096
 MAX_SIZE_MB = 500
@@ -35,11 +36,12 @@ async def _debounce_notify(user_id: int, context, chat_id: int):
     await asyncio.sleep(1)
     if _user_timers.get(user_id) is asyncio.current_task():
         sess = db.get_session(user_id)
-        if sess and sess.get("state") == S5:
-            jumlah = sess["data"]["count"]
+        if sess and sess.get("state") in [S0, S5]:
+            jumlah_file = sess["data"]["count"]
+            jumlah_kontak = sess["data"].get("total_contacts", 0)
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"{jumlah} file diterima. /done jika selesai."
+                text=f"{jumlah_file} file diterima ({jumlah_kontak} kontak). /done jika selesai."
             )
 
 
@@ -71,8 +73,11 @@ async def cmd_txttovcf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.increment_usage(user_id)
     _cancel_timer(user_id)
     _clear_buffers(user_id)
-    db.set_session(user_id, S1, {})
-    await update.message.reply_text("Nama kontak: (misal: FEE)")
+    db.set_session(user_id, S0, {"count": 0, "total_size": 0, "total_contacts": 0})
+    await update.message.reply_text(
+        "Silakan kirim file TXT.\n"
+        "Ketik /done jika sudah selesai mengirim semua file."
+    )
 
 
 async def handle_ttv_contact_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,21 +128,17 @@ async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     data = sess["data"]
     data["awalan"] = int(text)
-    data["count"] = 0
-    data["total_size"] = 0
-    _clear_buffers(user_id)
-    db.set_session(user_id, S5, data)
-    await update.message.reply_text(
-        "Kirim file TXT.\n"
-        "Ketik /done jika selesai."
-    )
+    db.set_session(user_id, S4, data) # Keep S4 but trigger processing
+    
+    # Trigger processing immediately
+    await handle_ttv_process(update, context)
 
 
 async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     sess = db.get_session(user_id)
-    if sess["state"] != S5:
+    if sess["state"] not in [S0, S5]:
         return
 
     doc = update.message.document
@@ -154,7 +155,7 @@ async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     async with get_user_lock(user_id):
         sess = db.get_session(user_id)
-        if sess["state"] != S5:
+        if sess["state"] not in [S0, S5]:
             return
         data = sess["data"]
 
@@ -169,7 +170,21 @@ async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data["count"] += 1
         data["total_size"] += doc.file_size
-        db.set_session(user_id, S5, data)
+        
+        # Hitung jumlah kontak di file ini secara cerdas
+        try:
+            # We don't want to read the whole file if it's huge just for counting,
+            # but for TXT to VCF we usually need to know how many lines.
+            with open(out_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = 0
+                for line in f:
+                    if line.strip():
+                        lines += 1
+                data["total_contacts"] = data.get("total_contacts", 0) + lines
+        except Exception:
+            pass
+            
+        db.set_session(user_id, sess["state"], data)
 
     _reset_timer(user_id, context, chat_id)
 
@@ -179,10 +194,20 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     _cancel_timer(user_id)
 
     sess = db.get_session(user_id)
-    if sess["state"] != S5:
+    if sess["state"] == S0:
+        data = sess["data"]
+        if data["count"] == 0:
+            await update.message.reply_text("Belum ada file yang dikirim.")
+            return
+        
+        db.set_session(user_id, S1, data)
+        await update.message.reply_text(f"Total: {data.get('total_contacts', 0)} kontak.\n\nNama kontak: (misal: FEE)")
         return
-    data = sess["data"]
 
+    if sess["state"] not in [S0, S5]:
+        return
+    
+    data = sess["data"]
     if data["count"] == 0:
         await update.message.reply_text("Belum ada file yang dikirim.")
         return
@@ -190,7 +215,20 @@ async def handle_ttv_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     data["is_processing"] = True
-    db.set_session(user_id, S5, data)
+    db.set_session(user_id, sess["state"], data)
+    await handle_ttv_process(update, context)
+
+async def handle_ttv_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    sess = db.get_session(user_id)
+    data = sess["data"]
+    
+    # Check if already processing
+    if data.get("is_processing_final"):
+        return
+    data["is_processing_final"] = True
+    db.set_session(user_id, sess["state"], data)
+    
     await update.message.reply_text("Memproses...")
 
     user_dir = get_user_dir(user_id)

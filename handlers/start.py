@@ -88,7 +88,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [KeyboardButton("/txttovcf"), KeyboardButton("/vcftotxt"), KeyboardButton("/xlsxtotxt")],
         [KeyboardButton("/admin"), KeyboardButton("/merge"), KeyboardButton("/pecahvcf")],
         [KeyboardButton("/rename"), KeyboardButton("/count"), KeyboardButton("/vip")],
-        [KeyboardButton("/referal"), KeyboardButton("/reset"), KeyboardButton("/done")]
+        [KeyboardButton("/referal"), KeyboardButton("/reset"), KeyboardButton("/done")],
+        [KeyboardButton("/start")]
     ]
     reply_keyboard = ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True)
 

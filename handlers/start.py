@@ -1,5 +1,5 @@
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from database import db
 from middleware.session import clear_user_dir
@@ -56,32 +56,41 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username or "Bot"
     
     # 1. KIRIM REPLY SEGERA (INSTANT RESPONSE)
-    greeting = f"Halo {first_name}!"
+    greeting = f"<b>Halo {first_name}! Selamat datang di bot.</b>"
     fitur = (
-        "/txttovcf    - konversi file TXT ke VCF\n"
-        "/vcftotxt    - konversi file VCF ke TXT\n"
-        "/xlsxtotxt   - ekstrak kontak dari Excel/CSV\n"
-        "/admin       - buat file admin/navy VCF\n"
-        "/merge       - gabungkan file VCF\n"
-        "/pecahvcf    - pecah file VCF\n"
-        "/rename      - ganti nama file VCF\n"
-        "/count       - hitung jumlah kontak\n"
-        "/vip         - lihat & daftar paket VIP\n"
-        "/referal     - undang teman (Dapatkan VIP Gratis)\n"
-        "/reset       - bersihkan sesi aktif\n"
-        "/done        - selesaikan proses file\n"
-        "─────────────────\n"
-        " KHUSUS ADMIN FEE:\n"
-        "/stat        - lihat statistik & status bot\n"
-        "/daftar      - daftar pengguna bot\n"
-        "/brodcast    - kirim pesan massal (Teks)\n"
-        "/mediabroadcast - kirim pesan massal (Media/Foto/Video)\n"
-        "/addvip      - tambah member VIP\n"
-        "/delvip      - copot member VIP\n"
-        "/newmember   - buat member permanen\n"
-        "/delmember   - hapus member permanen\n"
-        "/resetdatabase - bersihkan cache server"
+        "<b>/txttovcf    - konversi file TXT ke VCF</b>\n"
+        "<b>/vcftotxt    - konversi file VCF ke TXT</b>\n"
+        "<b>/xlsxtotxt   - ekstrak kontak dari Excel/CSV</b>\n"
+        "<b>/admin       - buat file admin/navy VCF</b>\n"
+        "<b>/merge       - gabungkan file VCF</b>\n"
+        "<b>/pecahvcf    - pecah file VCF</b>\n"
+        "<b>/rename      - ganti nama file VCF</b>\n"
+        "<b>/count       - hitung jumlah kontak</b>\n"
+        "<b>/vip         - lihat & daftar paket VIP</b>\n"
+        "<b>/referal     - undang teman (Dapatkan VIP Gratis)</b>\n"
+        "<b>/reset       - bersihkan sesi aktif</b>\n"
+        "<b>/done        - selesaikan proses file</b>\n"
+        "<b>─────────────────</b>\n"
+        "<b>KHUSUS ADMIN FEE:</b>\n"
+        "<b>/stat        - lihat statistik & status bot</b>\n"
+        "<b>/daftar      - daftar pengguna bot</b>\n"
+        "<b>/brodcast    - kirim pesan massal (Teks)</b>\n"
+        "<b>/mediabroadcast - kirim pesan massal (Media/Foto/Video)</b>\n"
+        "<b>/addvip      - tambah member VIP</b>\n"
+        "<b>/delvip      - copot member VIP</b>\n"
+        "<b>/newmember   - buat member permanen</b>\n"
+        "<b>/delmember   - hapus member permanen</b>\n"
+        "<b>/resetdatabase - bersihkan cache server</b>"
     )
+
+    # 2. MENU BUTTONS (REPLY KEYBOARD)
+    keyboard_buttons = [
+        [KeyboardButton("/txttovcf"), KeyboardButton("/vcftotxt"), KeyboardButton("/xlsxtotxt")],
+        [KeyboardButton("/admin"), KeyboardButton("/merge"), KeyboardButton("/pecahvcf")],
+        [KeyboardButton("/rename"), KeyboardButton("/count"), KeyboardButton("/vip")],
+        [KeyboardButton("/referal"), KeyboardButton("/reset"), KeyboardButton("/done")]
+    ]
+    reply_keyboard = ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True)
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("Tutorial Penggunaan Bot", url=TUTORIAL_LINK)
@@ -89,14 +98,20 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_url = f"https://t.me/{ADMIN_CONTACT.lstrip('@')}"
 
     await update.message.reply_text(
-        f"<b>{first_name}</b>\n\n"
         f"{greeting}\n\n"
-        f"Fitur:\n"
-        f"<pre>{fitur}</pre>\n"
-        f"Owner: <a href='{admin_url}'>{ADMIN_CONTACT}</a>",
+        f"<b>Fitur Bot:</b>\n"
+        f"{fitur}\n\n"
+        f"<b>Owner: {ADMIN_CONTACT}</b>",
         parse_mode="HTML",
-        reply_markup=keyboard,
+        reply_markup=reply_keyboard,
         disable_web_page_preview=True
+    )
+
+    # Tambahkan inline keyboard secara terpisah jika perlu link tutorial
+    await update.message.reply_text(
+        "<b>Pencet tombol di bawah untuk tutorial:</b>",
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
 
     # 2. KERJAKAN CLEANUP DI BACKGROUND (TIDAK BLOKIR REPLY)

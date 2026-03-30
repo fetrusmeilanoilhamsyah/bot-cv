@@ -22,6 +22,6 @@ fi
 
 # 4. Jalankan bot di background (pake nohup atau screen/tmux)
 echo "Starting bot..."
-nohup ./.venv/bin/python3 main.py > logs/nohup.log 2>&1 &
+nohup ./venv/bin/python3 main.py > logs/nohup.log 2>&1 &
 
 echo "✅ Deployment Berhasil Bang! Bot sudah jalan di background."

@@ -103,7 +103,7 @@ async def handle_ttv_per_file(update: Update, context: ContextTypes.DEFAULT_TYPE
     data = sess["data"]
     data["per_file"] = int(text)
     db.set_session(user_id, S3, data)
-    await update.message.reply_text("Nama file: (misal: KONTAK)")
+    await update.message.reply_text("Nama file: (misal: FEE)")
 
 
 async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -114,7 +114,7 @@ async def handle_ttv_file_name(update: Update, context: ContextTypes.DEFAULT_TYP
     data = sess["data"]
     data["file_name"] = sanitize_filename(update.message.text.strip())
     db.set_session(user_id, S4, data)
-    await update.message.reply_text("Index mulai: (misal: 1)")
+    await update.message.reply_text("Nomor file: (misal: 1)")
 
 
 async def handle_ttv_awalan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -307,34 +307,56 @@ async def handle_ttv_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Menyiapkan {total_files} file..."
         )
 
-        def read_bytes(path: str) -> bytes:
-            with open(path, "rb") as f:
-                return f.read()
-
-        # asyncio.gather baca semua file bersamaan di thread pool
-        file_bytes_list = await asyncio.gather(*[
-            loop.run_in_executor(None, read_bytes, out_file)
-            for _, out_file in results
-        ])
-
-        # ── STEP 2: Kirim SATU PER SATU dari memori — ORDER 100% TERJAMIN ──
-        import io
-        for idx, ((label, _), file_bytes) in enumerate(zip(results, file_bytes_list), 1):
-            await update.message.reply_document(
-                document=io.BytesIO(file_bytes),
-                filename=f"{label}.vcf"
-            )
-            # Update counter setiap 5 file
-            if idx % 5 == 0 or idx == total_files:
-                try:
-                    await send_status.edit_text(
-                        f"Mengirim {total_files} file... {idx}/{total_files}"
+        # ── TEKNOLOGI BARU: KIRIM BULK/ALBUM LANGSUNG DARI DISK ──
+        # Bebas RAM lag & langsung kirim
+        from telegram import InputMediaDocument
+        
+        chunk_size = 10
+        for i in range(0, len(results), chunk_size):
+            chunk_results = results[i:i + chunk_size]
+            
+            media_group = []
+            open_files = []
+            
+            for label, out_file in chunk_results:
+                # Buka file mode read-binary (Telegram API yg akan handle uploadnya)
+                f = open(out_file, "rb")
+                open_files.append(f)
+                media_group.append(
+                    InputMediaDocument(
+                        media=f,
+                        filename=f"{label}.vcf"
                     )
-                except Exception:
-                    pass
+                )
+                
+            try:
+                if len(media_group) == 1:
+                    # telegram API mensyaratkan media_group >= 2 item
+                    await update.message.reply_document(
+                        document=media_group[0].media,
+                        filename=media_group[0].filename,
+                        read_timeout=120, write_timeout=120, connect_timeout=60
+                    )
+                else:
+                    await update.message.reply_media_group(
+                        media=media_group,
+                        read_timeout=120,
+                        write_timeout=120,
+                        connect_timeout=60
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Gagal kirim media group: {e}")
+            finally:
+                # Tutup handle setelah dikirim
+                for f in open_files:
+                    try:
+                        f.close()
+                    except:
+                        pass
 
         try:
-            await send_status.edit_text(f"Selesai. {total_files} file terkirim.")
+            await send_status.edit_text(f"File berhasil dikirim! 🔥\nSelesai menyiapkan {total_files} file.")
         except Exception:
             pass
 

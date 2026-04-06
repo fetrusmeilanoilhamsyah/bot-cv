@@ -90,7 +90,10 @@ async def handle_vcftotxt_file(update: Update, context: ContextTypes.DEFAULT_TYP
     user_dir = get_user_dir(user_id)
     v2t_dir = os.path.join(user_dir, "vcftotxt")
     os.makedirs(v2t_dir, exist_ok=True)
-    out_path = os.path.join(v2t_dir, f"{msg_id}.vcf")
+    
+    orig_name = doc.file_name if doc.file_name else f"{msg_id}.vcf"
+    safe_name = sanitize_filename(orig_name)
+    out_path = os.path.join(v2t_dir, f"{msg_id}____{safe_name}")
     
     await file_obj.download_to_drive(out_path)
 
@@ -167,13 +170,21 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
     user_dir = get_user_dir(user_id)
     v2t_dir  = os.path.join(user_dir, "vcftotxt")
 
-    # Sorted by message_id — URUTAN terjamin
+    # Sorted by original numbers inside filename — URUTAN terjamin sesuai input
     files = []
     if os.path.exists(v2t_dir):
-        files = sorted(
-            [f for f in os.listdir(v2t_dir) if f.endswith(".vcf")],
-            key=lambda x: int(x.split(".")[0])
-        )
+        raw_files = [f for f in os.listdir(v2t_dir) if f.endswith(".vcf")]
+        
+        def extract_num(f_name):
+            import re
+            # Ambil original name yg ada setelah ____
+            orig = f_name.split("____")[-1] if "____" in f_name else f_name
+            nums = re.findall(r'\d+', orig)
+            if nums:
+                return int(nums[-1]) # Ambil angka terakhir misal 'Kazuha 74.vcf' -> 74
+            return 0
+            
+        files = sorted(raw_files, key=extract_num)
 
     loop = asyncio.get_running_loop()
 
@@ -201,16 +212,29 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
                 except Exception:
                     results[idx] = []
 
-        # Gabung nomor sesuai urutan file asli
-        numbers = []
-        for i in range(len(files)):
-            numbers.extend(results.get(i, []))
+        # Pisahkan output menjadi 1 TXT per VCF
+        results_files = []
+        out_temp_dir = os.path.join(user_dir, "txt_reports")
+        import shutil
+        shutil.rmtree(out_temp_dir, ignore_errors=True)
+        os.makedirs(out_temp_dir, exist_ok=True)
 
-        out_txt = os.path.join(user_dir, f"{file_name}.txt")
-        with open(out_txt, "w", encoding="utf-8") as file_out:
-            file_out.write("\n".join(numbers))
+        for i, fname in enumerate(files):
+            import re
+            nums = results.get(i, [])
+            
+            # Coba ekstrak nomor asli dari file input (e.g. frr 74.vcf)
+            orig = fname.split("____")[-1] if "____" in fname else fname
+            extracted_nums = re.findall(r'\d+', orig)
+            file_num = extracted_nums[-1] if extracted_nums else str(i+1)
+            
+            label = f"{file_name} {file_num}"
+            out_txt = os.path.join(out_temp_dir, f"{label}.txt")
+            with open(out_txt, "w", encoding="utf-8") as file_out:
+                file_out.write("\n".join(nums))
+            results_files.append((label, out_txt))
 
-        return numbers, out_txt
+        return results_files, out_temp_dir
 
     async def update_progress(pct: int):
         try:
@@ -221,31 +245,57 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
     if total_files > 10:
         await update_progress(10)
 
-    numbers, out_txt = await loop.run_in_executor(None, do_export_parallel)
+    results_files, out_temp_dir = await loop.run_in_executor(None, do_export_parallel)
 
     await update_progress(90)
 
     try:
-        if not numbers:
+        from telegram import InputMediaDocument
+        
+        chunk_size = 10
+        total_created = len(results_files)
+        
+        if total_created == 0:
             await progress_msg.edit_text("Gagal. Nomor tidak ditemukan.")
-            _clear_buffers(user_id)
-            try:
-                if os.path.exists(out_txt):
-                    os.remove(out_txt)
-            except Exception:
-                pass
             return
 
-        await progress_msg.edit_text(
-            f"Selesai. {len(numbers)} nomor dari {total_files} file."
-        )
-        with open(out_txt, "rb") as f:
-            await update.message.reply_document(document=f, filename=f"{file_name}.txt")
+        for i in range(0, total_created, chunk_size):
+            chunk = results_files[i:i + chunk_size]
+            
+            media_group = []
+            open_files = []
+            for label, out_txt in chunk:
+                f = open(out_txt, "rb")
+                open_files.append(f)
+                media_group.append(
+                    InputMediaDocument(media=f, filename=f"{label}.txt")
+                )
+            
+            try:
+                if len(media_group) == 1:
+                    await update.message.reply_document(
+                        document=media_group[0].media,
+                        filename=media_group[0].filename,
+                        read_timeout=120, connect_timeout=60, write_timeout=120
+                    )
+                else:
+                    await update.message.reply_media_group(
+                        media=media_group,
+                        read_timeout=120, connect_timeout=60, write_timeout=120
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Gagal kirim media group vcftotxt: {e}")
+            finally:
+                for f in open_files:
+                    try: f.close()
+                    except: pass
+
+        await progress_msg.edit_text(f"Selesai! {total_created} file TXT dikirim.")
     finally:
         db.clear_session(user_id)
         _clear_buffers(user_id)
         try:
-            if os.path.exists(out_txt):
-                os.remove(out_txt)
+            shutil.rmtree(out_temp_dir, ignore_errors=True)
         except Exception:
             pass

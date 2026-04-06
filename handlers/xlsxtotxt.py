@@ -55,6 +55,10 @@ def _extract_numbers_sync(filepath: str, ext: str) -> list:
     return numbers
 
 async def cmd_xlsxtotxt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from middleware.auth import require_member
+    if not await require_member(update, context):
+        return
+        
     user_id = update.effective_user.id
     db.increment_usage(user_id)
     clear_user_dir(user_id)

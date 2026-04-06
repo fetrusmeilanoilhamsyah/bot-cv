@@ -31,6 +31,10 @@ def _count_contacts_sync(filepath: str, ext: str) -> int:
     return count
 
 async def cmd_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from middleware.auth import require_member
+    if not await require_member(update, context):
+        return
+        
     user_id = update.effective_user.id
     db.increment_usage(user_id)
     

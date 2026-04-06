@@ -69,19 +69,24 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>/vip         - lihat & daftar paket VIP</b>\n"
         "<b>/referal     - undang teman (Dapatkan VIP Gratis)</b>\n"
         "<b>/reset       - bersihkan sesi aktif</b>\n"
-        "<b>/done        - selesaikan proses file</b>\n"
-        "<b>─────────────────</b>\n"
-        "<b>KHUSUS ADMIN FEE:</b>\n"
-        "<b>/stat        - lihat statistik & status bot</b>\n"
-        "<b>/daftar      - daftar pengguna bot</b>\n"
-        "<b>/brodcast    - kirim pesan massal (Teks)</b>\n"
-        "<b>/mediabroadcast - kirim pesan massal (Media/Foto/Video)</b>\n"
-        "<b>/addvip      - tambah member VIP</b>\n"
-        "<b>/delvip      - copot member VIP</b>\n"
-        "<b>/newmember   - buat member permanen</b>\n"
-        "<b>/delmember   - hapus member permanen</b>\n"
-        "<b>/resetdatabase - bersihkan cache server</b>"
+        "<b>/done        - selesaikan proses file</b>"
     )
+    
+    from middleware.auth import is_admin
+    if is_admin(user.id):
+        fitur += (
+            "\n<b>─────────────────</b>\n"
+            "<b>KHUSUS ADMIN FEE:</b>\n"
+            "<b>/stat        - lihat statistik & status bot</b>\n"
+            "<b>/daftar      - daftar pengguna bot</b>\n"
+            "<b>/brodcast    - kirim pesan massal (Teks)</b>\n"
+            "<b>/mediabroadcast - kirim pesan massal (Media/Foto/Video)</b>\n"
+            "<b>/addvip      - tambah member VIP</b>\n"
+            "<b>/delvip      - copot member VIP</b>\n"
+            "<b>/newmember   - buat member permanen</b>\n"
+            "<b>/delmember   - hapus member permanen</b>\n"
+            "<b>/resetdatabase - bersihkan cache server</b>"
+        )
 
     # 2. MENU BUTTONS (REPLY KEYBOARD)
     keyboard_buttons = [

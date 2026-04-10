@@ -308,53 +308,62 @@ async def handle_ttv_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Menyiapkan {total_files} file..."
         )
 
-        # ── TEKNOLOGI BARU: KIRIM BULK/ALBUM LANGSUNG DARI DISK ──
-        # Bebas RAM lag & langsung kirim
+        # ── KIRIM BULK/ALBUM LANGSUNG DARI DISK ──
         from telegram import InputMediaDocument
+        from telegram.error import RetryAfter
+        import logging as _log
+        _logger = _log.getLogger(__name__)
         
         chunk_size = 10
         for i in range(0, len(results), chunk_size):
             chunk_results = results[i:i + chunk_size]
             
             media_group = []
-            open_files = []
+            open_files  = []
             
             for label, out_file in chunk_results:
-                # Buka file mode read-binary (Telegram API yg akan handle uploadnya)
                 f = open(out_file, "rb")
                 open_files.append(f)
-                media_group.append(
-                    InputMediaDocument(
-                        media=f,
-                        filename=f"{label}.vcf"
-                    )
-                )
-                
-            try:
+                media_group.append(InputMediaDocument(media=f, filename=f"{label}.vcf"))
+
+            async def _send_chunk():
                 if len(media_group) == 1:
-                    # telegram API mensyaratkan media_group >= 2 item
+                    # Pakai label & handle eksplisit — bukan atribut InputMediaDocument yg bisa None
+                    label_name, _ = chunk_results[0]
+                    open_files[0].seek(0)
                     await update.message.reply_document(
-                        document=media_group[0].media,
-                        filename=media_group[0].filename,
+                        document=open_files[0],
+                        filename=f"{label_name}.vcf",
                         read_timeout=120, write_timeout=120, connect_timeout=60
                     )
                 else:
                     await update.message.reply_media_group(
                         media=media_group,
-                        read_timeout=120,
-                        write_timeout=120,
-                        connect_timeout=60
+                        read_timeout=120, write_timeout=120, connect_timeout=60
                     )
+
+            try:
+                await _send_chunk()
+            except RetryAfter as e:
+                # Telegram flood limit — tunggu sesuai instruksi Telegram lalu kirim ulang
+                wait_secs = int(e.retry_after) + 2
+                _logger.warning(f"Flood limit! Tunggu {wait_secs}s lalu kirim ulang chunk {i//chunk_size + 1}...")
+                await asyncio.sleep(wait_secs)
+                try:
+                    for f in open_files: f.seek(0)
+                    await _send_chunk()
+                except Exception as e2:
+                    _logger.error(f"Gagal kirim ulang setelah RetryAfter: {e2}")
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).error(f"Gagal kirim media group: {e}")
+                _logger.error(f"Gagal kirim media group chunk {i//chunk_size + 1}: {e}")
             finally:
-                # Tutup handle setelah dikirim
                 for f in open_files:
-                    try:
-                        f.close()
-                    except:
-                        pass
+                    try: f.close()
+                    except: pass
+            
+            # Jeda kecil antar chunk cegah flood limit Telegram
+            if i + chunk_size < len(results):
+                await asyncio.sleep(0.5)
 
         try:
             await send_status.edit_text(f"File berhasil dikirim! 🔥\nSelesai menyiapkan {total_files} file.")

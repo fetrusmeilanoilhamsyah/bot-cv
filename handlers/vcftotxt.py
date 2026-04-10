@@ -255,22 +255,22 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
             chunk = results_files[i:i + chunk_size]
             
             media_group = []
-            open_files = []
+            open_files  = []
             for label, out_txt in chunk:
                 f = open(out_txt, "rb")
                 open_files.append(f)
-                media_group.append(
-                    InputMediaDocument(media=f, filename=f"{label}.txt")
-                )
-            
-            try:
+                media_group.append(InputMediaDocument(media=f, filename=f"{label}.txt"))
+
+            from telegram.error import RetryAfter as _RetryAfter
+            import logging as _log2
+            _logger2 = _log2.getLogger(__name__)
+
+            async def _send_v2t_chunk():
                 if len(media_group) == 1:
-                    # Kirim dengan reply_document, pastikan pakai string filename eksplisit
                     label_name, _ = chunk[0]
-                    f_handle = open_files[0]
-                    f_handle.seek(0)  # pastikan pointer di awal
+                    open_files[0].seek(0)
                     await update.message.reply_document(
-                        document=f_handle,
+                        document=open_files[0],
                         filename=f"{label_name}.txt",
                         read_timeout=120, connect_timeout=60, write_timeout=120
                     )
@@ -279,13 +279,29 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
                         media=media_group,
                         read_timeout=120, connect_timeout=60, write_timeout=120
                     )
+
+            try:
+                await _send_v2t_chunk()
+            except _RetryAfter as e:
+                wait_secs = int(e.retry_after) + 2
+                _logger2.warning(f"vcftotxt flood limit! Tunggu {wait_secs}s...")
+                await asyncio.sleep(wait_secs)
+                try:
+                    for f in open_files: f.seek(0)
+                    await _send_v2t_chunk()
+                except Exception as e2:
+                    _logger2.error(f"vcftotxt gagal kirim ulang: {e2}")
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).error(f"Gagal kirim media group vcftotxt: {e}")
+                _logger2.error(f"vcftotxt gagal kirim chunk: {e}")
             finally:
                 for f in open_files:
                     try: f.close()
                     except: pass
+
+            # Jeda kecil antar chunk cegah flood limit Telegram
+            if i + chunk_size < total_created:
+                await asyncio.sleep(0.5)
+
 
         await progress_msg.edit_text(f"Selesai! {total_created} file TXT dikirim.")
     finally:

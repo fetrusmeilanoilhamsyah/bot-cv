@@ -16,7 +16,6 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    CallbackQueryHandler,
     filters,
     ContextTypes,
 )
@@ -128,18 +127,36 @@ logging.getLogger("httpx").setLevel(logging.WARNING)  # Mencegah spam log getUpd
 logger = logging.getLogger(__name__)
 
 # ===== RATE LIMITING =====
-MAX_CONCURRENT_PER_USER = 2  # Max 2 operations per user at once
-user_semaphores = defaultdict(lambda: Semaphore(MAX_CONCURRENT_PER_USER))
+# Command: max 2 operasi paralel per user (cegah spam)
+# File upload: max 16 agar file ke-3, 4, dst tidak antri saat user kirim banyak sekaligus
+MAX_CONCURRENT_PER_USER = 2
+MAX_CONCURRENT_FILE_UPLOAD = 16
+user_semaphores      = defaultdict(lambda: Semaphore(MAX_CONCURRENT_PER_USER))
+user_file_semaphores = defaultdict(lambda: Semaphore(MAX_CONCURRENT_FILE_UPLOAD))
 
 
 def rate_limiter(func):
-    """Decorator untuk rate limiting per user"""
+    """Decorator untuk rate limiting per user (untuk command)"""
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         text = update.message.text if update.message else "NON-TEXT"
         logger.info(f"Incoming: User {user_id} -> {text}")
         
         semaphore = user_semaphores[user_id]
+        
+        async with semaphore:
+            return await func(update, context)
+    
+    return wrapper
+
+
+def file_rate_limiter(func):
+    """Decorator untuk rate limiting file upload — limit lebih longgar agar tidak antri"""
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_id = update.effective_user.id
+        logger.info(f"Incoming: User {user_id} -> None")
+        
+        semaphore = user_file_semaphores[user_id]
         
         async with semaphore:
             return await func(update, context)
@@ -320,8 +337,8 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_show_vip_menu, pattern="^show_vip_menu$"))
     app.add_handler(CallbackQueryHandler(handle_reset_callback, pattern="^admin_db_reset"))
 
-    # Message handlers (wrapped with rate limiter)
-    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO | filters.ANIMATION, rate_limiter(file_router)))
+    # Message handlers
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO | filters.ANIMATION, file_rate_limiter(file_router)))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, rate_limiter(text_router)))
 
     # Error handler

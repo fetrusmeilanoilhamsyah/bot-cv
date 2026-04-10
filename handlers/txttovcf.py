@@ -171,14 +171,15 @@ async def handle_ttv_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["count"] += 1
         data["total_size"] += doc.file_size
         
-        # Hitung jumlah kontak di file ini secara cerdas
+        # Hitung jumlah kontak di file ini — hanya hitung baris yang valid nomor HP
         try:
-            # We don't want to read the whole file if it's huge just for counting,
-            # but for TXT to VCF we usually need to know how many lines.
+            import re as _re
+            _phone_re = _re.compile(r'^[\+\d][\d\s\-\.\(\)]{6,}$')
             with open(out_path, "r", encoding="utf-8", errors="ignore") as f:
                 lines = 0
                 for line in f:
-                    if line.strip():
+                    stripped = line.strip()
+                    if stripped and _phone_re.match(stripped):
                         lines += 1
                 data["total_contacts"] = data.get("total_contacts", 0) + lines
         except Exception:
@@ -295,12 +296,12 @@ async def handle_ttv_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
         total_files = len(results)
 
         # ── Tampilkan ringkasan nama file dulu ───────────────────────────────
-        header = f"{header if 'header' in locals() else ''}{len(all_numbers)} kontak -> {total_files} file\n"
+        header_text = f"{len(all_numbers)} kontak -> {total_files} file\n"
         lines  = [f"{file_name} {awalan + i}.vcf" for i in range(total_files)]
 
         CHUNK = 50
         for i in range(0, len(lines), CHUNK):
-            msg = (header if i == 0 else "") + "\n".join(lines[i:i + CHUNK])
+            msg = (header_text if i == 0 else "") + "\n".join(lines[i:i + CHUNK])
             await update.message.reply_text(msg)
 
         send_status = await update.message.reply_text(

@@ -100,12 +100,38 @@ async def handle_pecah_vcf_file(update: Update, context: ContextTypes.DEFAULT_TY
 
         output_files = await loop.run_in_executor(None, process_pecah)
         
-        for idx, out_path in enumerate(output_files, 1):
-            with open(out_path, "rb") as f:
-                await update.message.reply_document(
-                    document=f,
-                    filename=os.path.basename(out_path)
+        from telegram import InputMediaDocument
+        chunk_size = 10
+        for i in range(0, len(output_files), chunk_size):
+            chunk = output_files[i:i + chunk_size]
+            media_group = []
+            open_fds = []
+            for out_path in chunk:
+                fd = open(out_path, "rb")
+                open_fds.append(fd)
+                media_group.append(
+                    InputMediaDocument(media=fd, filename=os.path.basename(out_path))
                 )
+            try:
+                if len(media_group) == 1:
+                    open_fds[0].seek(0)
+                    await update.message.reply_document(
+                        document=open_fds[0],
+                        filename=os.path.basename(chunk[0]),
+                        read_timeout=120, write_timeout=120, connect_timeout=60
+                    )
+                else:
+                    await update.message.reply_media_group(
+                        media=media_group,
+                        read_timeout=120, write_timeout=120, connect_timeout=60
+                    )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"PecahVCF send error: {e}")
+            finally:
+                for fd in open_fds:
+                    try: fd.close()
+                    except: pass
         
     except Exception as e:
         import logging

@@ -170,21 +170,19 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
     user_dir = get_user_dir(user_id)
     v2t_dir  = os.path.join(user_dir, "vcftotxt")
 
-    # Sorted by original numbers inside filename — URUTAN terjamin sesuai input
+    # Sorted by msg_id (prefix sebelum ____) — URUTAN DIJAMIN, tidak bergantung nama file
     files = []
     if os.path.exists(v2t_dir):
         raw_files = [f for f in os.listdir(v2t_dir) if f.endswith(".vcf")]
         
-        def extract_num(f_name):
-            import re
-            # Ambil original name yg ada setelah ____
-            orig = f_name.split("____")[-1] if "____" in f_name else f_name
-            nums = re.findall(r'\d+', orig)
-            if nums:
-                return int(nums[-1]) # Ambil angka terakhir misal 'Kazuha 74.vcf' -> 74
-            return 0
+        def extract_msg_id(f_name):
+            # Format simpan: {msg_id}____{safe_name}.vcf — ambil msg_id sebagai int
+            try:
+                return int(f_name.split("____")[0])
+            except (ValueError, IndexError):
+                return 0
             
-        files = sorted(raw_files, key=extract_num)
+        files = sorted(raw_files, key=extract_msg_id)
 
     loop = asyncio.get_running_loop()
 
@@ -220,15 +218,9 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
         os.makedirs(out_temp_dir, exist_ok=True)
 
         for i, fname in enumerate(files):
-            import re
             nums = results.get(i, [])
             
-            # Coba ekstrak nomor asli dari file input (e.g. frr 74.vcf)
-            orig = fname.split("____")[-1] if "____" in fname else fname
-            extracted_nums = re.findall(r'\d+', orig)
-            file_num = extracted_nums[-1] if extracted_nums else str(i+1)
-            
-            label = f"{file_name} {file_num}"
+            label = f"{file_name} {i+1}"
             out_txt = os.path.join(out_temp_dir, f"{label}.txt")
             with open(out_txt, "w", encoding="utf-8") as file_out:
                 file_out.write("\n".join(nums))
@@ -273,9 +265,13 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
             
             try:
                 if len(media_group) == 1:
+                    # Kirim dengan reply_document, pastikan pakai string filename eksplisit
+                    label_name, _ = chunk[0]
+                    f_handle = open_files[0]
+                    f_handle.seek(0)  # pastikan pointer di awal
                     await update.message.reply_document(
-                        document=media_group[0].media,
-                        filename=media_group[0].filename,
+                        document=f_handle,
+                        filename=f"{label_name}.txt",
                         read_timeout=120, connect_timeout=60, write_timeout=120
                     )
                 else:

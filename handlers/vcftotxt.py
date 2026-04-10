@@ -303,7 +303,13 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
                 await asyncio.sleep(0.5)
 
 
-        await progress_msg.edit_text(f"Selesai! {total_created} file TXT dikirim.")
+        await progress_msg.edit_text(
+            f"Proses selesai.\n"
+            f"Total file VCF  : {total_files}\n"
+            f"Total file TXT  : {total_created}\n"
+            f"File dikirim    : {total_created} file"
+        )
+
     finally:
         db.clear_session(user_id)
         _clear_buffers(user_id)
@@ -311,3 +317,4 @@ async def handle_vcftotxt_naming(update: Update, context: ContextTypes.DEFAULT_T
             shutil.rmtree(out_temp_dir, ignore_errors=True)
         except Exception:
             pass
+

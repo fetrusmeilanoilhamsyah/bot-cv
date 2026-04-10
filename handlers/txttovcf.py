@@ -366,7 +366,12 @@ async def handle_ttv_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await asyncio.sleep(0.5)
 
         try:
-            await send_status.edit_text(f"File berhasil dikirim! 🔥\nSelesai menyiapkan {total_files} file.")
+            await send_status.edit_text(
+                f"Proses selesai.\n"
+                f"Total file   : {total_files} VCF\n"
+                f"Total kontak : {len(all_numbers)} nomor\n"
+                f"File dikirim : {total_files} file"
+            )
         except Exception:
             pass
 

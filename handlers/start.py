@@ -56,66 +56,76 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username or "Bot"
     
     # 1. KIRIM REPLY SEGERA (INSTANT RESPONSE)
-    greeting = f"<b>Halo {first_name}! Selamat datang di bot.</b>"
+    greeting = f"<b>Halo {first_name}!</b>\nSelamat datang di bot konversi kontak."
+    
     fitur = (
-        "<b>/txttovcf    - konversi file TXT ke VCF</b>\n"
-        "<b>/vcftotxt    - konversi file VCF ke TXT</b>\n"
-        "<b>/xlsxtotxt   - ekstrak kontak dari Excel/CSV</b>\n"
-        "<b>/admin       - buat file admin/navy VCF</b>\n"
-        "<b>/merge       - gabungkan file VCF</b>\n"
-        "<b>/pecahvcf    - pecah file VCF</b>\n"
-        "<b>/rename      - ganti nama file VCF</b>\n"
-        "<b>/count       - hitung jumlah kontak</b>\n"
-        "<b>/vip         - lihat & daftar paket VIP</b>\n"
-        "<b>/referal     - undang teman (Dapatkan VIP Gratis)</b>\n"
-        "<b>/reset       - bersihkan sesi aktif</b>\n"
-        "<b>/done        - selesaikan proses file</b>"
+        "╔═══════════════════╗\n"
+        "║   <b>FITUR UTAMA</b>      ║\n"
+        "╚═══════════════════╝\n\n"
+        "/txttovcf     • Konversi TXT → VCF\n"
+        "/vcftotxt     • Konversi VCF → TXT\n"
+        "/xlsxtotxt    • Ekstrak Excel/CSV\n"
+        "/admin        • Buat file Admin VCF\n"
+        "/merge        • Gabungkan file VCF\n"
+        "/pecahvcf     • Pecah file VCF\n"
+        "/rename       • Ganti nama VCF\n"
+        "/count        • Hitung kontak\n\n"
+        "╔═══════════════════╗\n"
+        "║   <b>FITUR PREMIUM</b>   ║\n"
+        "╚═══════════════════╝\n\n"
+        "/vip          • Paket VIP\n"
+        "/referal      • VIP Gratis (Undang Teman)\n\n"
+        "╔═══════════════════╗\n"
+        "║   <b>UTILITAS</b>        ║\n"
+        "╚═══════════════════╝\n\n"
+        "/reset        • Bersihkan sesi\n"
+        "/done         • Selesaikan proses"
     )
     
     from middleware.auth import is_admin
     if is_admin(user.id):
         fitur += (
-            "\n<b>─────────────────</b>\n"
-            "<b>KHUSUS ADMIN FEE:</b>\n"
-            "<b>/stat        - lihat statistik & status bot</b>\n"
-            "<b>/daftar      - daftar pengguna bot</b>\n"
-            "<b>/brodcast    - kirim pesan massal (Teks)</b>\n"
-            "<b>/mediabroadcast - kirim pesan massal (Media/Foto/Video)</b>\n"
-            "<b>/addvip      - tambah member VIP</b>\n"
-            "<b>/delvip      - copot member VIP</b>\n"
-            "<b>/newmember   - buat member permanen</b>\n"
-            "<b>/delmember   - hapus member permanen</b>\n"
-            "<b>/resetdatabase - bersihkan cache server</b>"
+            "\n\n╔═══════════════════╗\n"
+            "║  <b>ADMIN ONLY</b>      ║\n"
+            "╚═══════════════════╝\n\n"
+            "/stat              • Statistik bot\n"
+            "/daftar            • Daftar user\n"
+            "/brodcast          • Broadcast teks\n"
+            "/mediabroadcast    • Broadcast media\n"
+            "/addvip            • Tambah VIP\n"
+            "/delvip            • Hapus VIP\n"
+            "/newmember         • Buat member permanen\n"
+            "/delmember         • Hapus member permanen\n"
+            "/resetdatabase     • Bersihkan cache"
         )
 
-    # 2. MENU BUTTONS (REPLY KEYBOARD)
+    # 2. MENU BUTTONS (REPLY KEYBOARD) - Simetris & rapi
     keyboard_buttons = [
-        [KeyboardButton("/txttovcf"), KeyboardButton("/vcftotxt"), KeyboardButton("/xlsxtotxt")],
-        [KeyboardButton("/admin"), KeyboardButton("/merge"), KeyboardButton("/pecahvcf")],
-        [KeyboardButton("/rename"), KeyboardButton("/count"), KeyboardButton("/vip")],
-        [KeyboardButton("/referal"), KeyboardButton("/reset"), KeyboardButton("/done")],
+        [KeyboardButton("/txttovcf"), KeyboardButton("/vcftotxt")],
+        [KeyboardButton("/xlsxtotxt"), KeyboardButton("/admin")],
+        [KeyboardButton("/merge"), KeyboardButton("/pecahvcf")],
+        [KeyboardButton("/rename"), KeyboardButton("/count")],
+        [KeyboardButton("/vip"), KeyboardButton("/referal")],
+        [KeyboardButton("/reset"), KeyboardButton("/done")],
         [KeyboardButton("/start")]
     ]
     reply_keyboard = ReplyKeyboardMarkup(keyboard_buttons, resize_keyboard=True)
 
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("Tutorial Penggunaan Bot", url=TUTORIAL_LINK)
+        InlineKeyboardButton("Tutorial Lengkap", url=TUTORIAL_LINK)
     ]])
-    admin_url = f"https://t.me/{ADMIN_CONTACT.lstrip('@')}"
 
     await update.message.reply_text(
-        f"{greeting}\n\n"
-        f"<b>Fitur Bot:</b>\n"
-        f"{fitur}\n\n"
-        f"<b>Owner: {ADMIN_CONTACT}</b>",
+        f"{greeting}\n\n{fitur}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"<b>Owner:</b> {ADMIN_CONTACT}",
         parse_mode="HTML",
         reply_markup=reply_keyboard,
         disable_web_page_preview=True
     )
 
-    # Tambahkan inline keyboard secara terpisah jika perlu link tutorial
     await update.message.reply_text(
-        "<b>Pencet tombol di bawah untuk tutorial:</b>",
+        "<b>Butuh panduan?</b> Klik tombol di bawah:",
         parse_mode="HTML",
         reply_markup=keyboard
     )
@@ -126,4 +136,4 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.clear_session(user.id)
         clear_user_dir(user.id)
     
-    asyncio.create_task(cleanup_bg())
+    asyncio.create_task(cleanup_bg())

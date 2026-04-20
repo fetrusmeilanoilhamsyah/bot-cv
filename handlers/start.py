@@ -66,7 +66,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/vcftotxt - Konversi VCF → TXT\n"
         "/xlsxtotxt - Ekstrak Excel/CSV\n"
         "/admin - Buat file Admin VCF\n"
-        "/merge - Gabungkan file VCF\n"
+        "/merge - Gabungkan file VCF/TXT\n"
         "/pecahvcf - Pecah file VCF\n"
         "/rename - Ganti nama VCF\n"
         "/count - Hitung kontak\n\n"

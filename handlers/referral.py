@@ -19,12 +19,12 @@ async def cmd_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     link = f"https://t.me/{bot_username}?start=ref_{user.id}"
     
     text = (
-        f"<b>PROGRAM REFERRAL</b> 🎁\n\n"
+        f"<b>PROGRAM REFERRAL</b> \n\n"
         f"Dapatkan <b>7 HARI VIP GRATIS</b> setiap kali kamu berhasil mengundang 5 teman baru!\n\n"
-        f"🔗 <b>Link Referral Kamu:</b>\n"
+        f" <b>Link Referral Kamu:</b>\n"
         f"<code>{link}</code>\n"
         f"<i>(Klik link di atas untuk menyalin)</i>\n\n"
-        f"📊 <b>Statistik Kamu:</b>\n"
+        f" <b>Statistik Kamu:</b>\n"
         f"• Teman diundang: {count} orang\n"
         f"• Kurang {remains} orang lagi untuk dapat Bonus 7 Hari VIP!"
     )

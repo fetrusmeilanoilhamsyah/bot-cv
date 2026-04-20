@@ -38,7 +38,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             db.set_member_vip(referrer_id, 7, "Referral Bonus")
                             await context.bot.send_message(
                                 chat_id=referrer_id,
-                                text=f"🎁 <b>BONUS REFERRAL!</b>\n\nTeman ke-{count} baru saja bergabung. Kamu mendapatkan <b>7 HARI VIP GRATIS!</b>",
+                                text=f" <b>BONUS REFERRAL!</b>\n\nTeman ke-{count} baru saja bergabung. Kamu mendapatkan <b>7 HARI VIP GRATIS!</b>",
                                 parse_mode="HTML"
                             )
                         else:
@@ -56,47 +56,47 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username or "Bot"
     
     # 1. KIRIM REPLY SEGERA (INSTANT RESPONSE)
-    greeting = f"<b>Halo {first_name}!</b>\nSelamat datang di bot konversi kontak."
+    greeting = f"<b>Halo {first_name}!</b> Selamat datang di bot konversi kontak."
     
     fitur = (
-        "╔═══════════════════╗\n"
-        "║   <b>FITUR UTAMA</b>      ║\n"
-        "╚═══════════════════╝\n\n"
-        "/txttovcf     • Konversi TXT → VCF\n"
-        "/vcftotxt     • Konversi VCF → TXT\n"
-        "/xlsxtotxt    • Ekstrak Excel/CSV\n"
-        "/admin        • Buat file Admin VCF\n"
-        "/merge        • Gabungkan file VCF\n"
-        "/pecahvcf     • Pecah file VCF\n"
-        "/rename       • Ganti nama VCF\n"
-        "/count        • Hitung kontak\n\n"
-        "╔═══════════════════╗\n"
-        "║   <b>FITUR PREMIUM</b>   ║\n"
-        "╚═══════════════════╝\n\n"
-        "/vip          • Paket VIP\n"
-        "/referal      • VIP Gratis (Undang Teman)\n\n"
-        "╔═══════════════════╗\n"
-        "║   <b>UTILITAS</b>        ║\n"
-        "╚═══════════════════╝\n\n"
-        "/reset        • Bersihkan sesi\n"
-        "/done         • Selesaikan proses"
+        "┏━━━━━━━━━━━━━━━━━┓\n"
+        "┃  <b>FITUR UTAMA</b>     ┃\n"
+        "┗━━━━━━━━━━━━━━━━━┛\n"
+        "/txttovcf - Konversi TXT → VCF\n"
+        "/vcftotxt - Konversi VCF → TXT\n"
+        "/xlsxtotxt - Ekstrak Excel/CSV\n"
+        "/admin - Buat file Admin VCF\n"
+        "/merge - Gabungkan file VCF\n"
+        "/pecahvcf - Pecah file VCF\n"
+        "/rename - Ganti nama VCF\n"
+        "/count - Hitung kontak\n\n"
+        "┏━━━━━━━━━━━━━━━━━┓\n"
+        "┃ <b>FITUR PREMIUM</b>   ┃\n"
+        "┗━━━━━━━━━━━━━━━━━┛\n"
+        "/vip - Paket VIP\n"
+        "/referal - VIP Gratis (Undang Teman)\n\n"
+        "┏━━━━━━━━━━━━━━━━━┓\n"
+        "┃   <b>UTILITAS</b>      ┃\n"
+        "┗━━━━━━━━━━━━━━━━━┛\n"
+        "/reset - Bersihkan sesi\n"
+        "/done - Selesaikan proses"
     )
     
     from middleware.auth import is_admin
     if is_admin(user.id):
         fitur += (
-            "\n\n╔═══════════════════╗\n"
-            "║  <b>ADMIN ONLY</b>      ║\n"
-            "╚═══════════════════╝\n\n"
-            "/stat              • Statistik bot\n"
-            "/daftar            • Daftar user\n"
-            "/brodcast          • Broadcast teks\n"
-            "/mediabroadcast    • Broadcast media\n"
-            "/addvip            • Tambah VIP\n"
-            "/delvip            • Hapus VIP\n"
-            "/newmember         • Buat member permanen\n"
-            "/delmember         • Hapus member permanen\n"
-            "/resetdatabase     • Bersihkan cache"
+            "\n\n┏━━━━━━━━━━━━━━━━━┓\n"
+            "┃  <b>ADMIN ONLY</b>     ┃\n"
+            "┗━━━━━━━━━━━━━━━━━┛\n"
+            "/stat - Statistik bot\n"
+            "/daftar - Daftar user\n"
+            "/brodcast - Broadcast teks\n"
+            "/mediabroadcast - Broadcast media\n"
+            "/addvip - Tambah VIP\n"
+            "/delvip - Hapus VIP\n"
+            "/newmember - Buat member permanen\n"
+            "/delmember - Hapus member permanen\n"
+            "/resetdatabase - Bersihkan cache"
         )
 
     # 2. MENU BUTTONS (REPLY KEYBOARD) - Simetris & rapi
@@ -116,9 +116,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]])
 
     await update.message.reply_text(
-        f"{greeting}\n\n{fitur}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"<b>Owner:</b> {ADMIN_CONTACT}",
+        f"{greeting}\n\n{fitur}\n\n━━━━━━━━━━━━━━━━━\n<b>Owner:</b> {ADMIN_CONTACT}",
         parse_mode="HTML",
         reply_markup=reply_keyboard,
         disable_web_page_preview=True

@@ -60,7 +60,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     fitur = (
         "┏━━━━━━━━━━━━━━━━━┓\n"
-        "┃  <b>FITUR UTAMA</b>     ┃\n"
+        "┃   <b>FITUR UTAMA</b>   ┃\n"
         "┗━━━━━━━━━━━━━━━━━┛\n"
         "/txttovcf - Konversi TXT → VCF\n"
         "/vcftotxt - Konversi VCF → TXT\n"
@@ -69,14 +69,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/merge - Gabungkan file VCF/TXT\n"
         "/pecahvcf - Pecah file VCF\n"
         "/rename - Ganti nama VCF\n"
-        "/count - Hitung kontak\n\n"
+        "/count - Hitung kontak\n"
         "┏━━━━━━━━━━━━━━━━━┓\n"
-        "┃ <b>FITUR PREMIUM</b>   ┃\n"
+        "┃    <b>EVENT BOT</b>    ┃\n"
         "┗━━━━━━━━━━━━━━━━━┛\n"
         "/vip - Paket VIP\n"
-        "/referal - VIP Gratis (Undang Teman)\n\n"
+        "/referal - VIP Gratis (Undang Teman)\n"
         "┏━━━━━━━━━━━━━━━━━┓\n"
-        "┃   <b>UTILITAS</b>      ┃\n"
+        "┃    <b>UTILITAS</b>     ┃\n"
         "┗━━━━━━━━━━━━━━━━━┛\n"
         "/reset - Bersihkan sesi\n"
         "/done - Selesaikan proses"
@@ -85,8 +85,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from middleware.auth import is_admin
     if is_admin(user.id):
         fitur += (
-            "\n\n┏━━━━━━━━━━━━━━━━━┓\n"
-            "┃  <b>ADMIN ONLY</b>     ┃\n"
+            "\n┏━━━━━━━━━━━━━━━━━┓\n"
+            "┃   <b>ADMIN ONLY</b>    ┃\n"
             "┗━━━━━━━━━━━━━━━━━┛\n"
             "/stat - Statistik bot\n"
             "/daftar - Daftar user\n"
@@ -116,7 +116,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]])
 
     await update.message.reply_text(
-        f"{greeting}\n\n{fitur}\n\n━━━━━━━━━━━━━━━━━\n<b>Owner:</b> {ADMIN_CONTACT}",
+        f"{greeting}\n{fitur}\n━━━━━━━━━━━━━━━━━\n<b>Owner:</b> {ADMIN_CONTACT}",
         parse_mode="HTML",
         reply_markup=reply_keyboard,
         disable_web_page_preview=True
